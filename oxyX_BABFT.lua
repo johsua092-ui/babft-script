@@ -1465,9 +1465,20 @@ buildBtn.MouseButton1Click:Connect(function()
         notify("oxyX AutoBuild", "Invalid .build data! File must contain JSON.", 3)
         return
     end
+    
+    -- DEBUG: Show parsed data count
+    buildStatus.Text = "Status: 📊 Parsed " .. #buildData .. " parts..."
+    buildStatus.TextColor3 = Color3.fromRGB(120, 200, 255)
+    task.wait(0.5)
 
     -- Analyze required blocks
     local requiredBlocks = analyzeBuildBlocks(buildData)
+    
+    -- DEBUG: Show block analysis
+    buildStatus.Text = "Status: 📊 Found " .. #requiredBlocks .. " block types..."
+    buildStatus.TextColor3 = Color3.fromRGB(120, 200, 255)
+    task.wait(0.5)
+    
     local hasRequired = true
     local missingList = {}
     
@@ -1475,6 +1486,12 @@ buildBtn.MouseButton1Click:Connect(function()
     for _, blockInfo in ipairs(requiredBlocks) do
         local blockName = blockInfo.name
         local amount = blockInfo.count
+        
+        -- DEBUG: Show checking inventory
+        buildStatus.Text = "Status: 📊 Checking " .. blockName .. " (" .. amount .. ")..."
+        buildStatus.TextColor3 = Color3.fromRGB(120, 200, 255)
+        task.wait(0.1)
+        
         if not hasBlock(blockName, amount) then
             hasRequired = false
             table.insert(missingList, blockName .. " (" .. amount .. ")")

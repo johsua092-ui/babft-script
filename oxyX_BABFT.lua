@@ -4,7 +4,7 @@
 -- ██║   ██║ ██╔██╗   ╚██╔╝   ██╔██╗ 
 -- ╚██████╔╝██╔╝ ██╗   ██║   ██╔╝ ██╗
 --  ╚═════╝ ╚═╝  ╚═╝   ╚═╝   ╚═╝  ╚═╝
--- oxyX BABFT Suite v2.3 | Powered by oxyX Market
+-- oxyX BABFT Suite v2.4 | Powered by oxyX Market
 -- Compatible: Xeno / Velocity / Fluxus
 
 -- ============================================================
@@ -692,7 +692,7 @@ local TitleLabel = Instance.new("TextLabel", TitleBar)
 TitleLabel.Size = UDim2.new(1, -100, 1, 0)
 TitleLabel.Position = UDim2.new(0, 14, 0, 0)
 TitleLabel.BackgroundTransparency = 1
-TitleLabel.Text = "⚡ oxyX BABFT Suite v2.3"
+TitleLabel.Text = "⚡ oxyX BABFT Suite v2.4"
 TitleLabel.TextColor3 = Color3.fromRGB(200, 150, 255)
 TitleLabel.Font = Enum.Font.GothamBold
 TitleLabel.TextSize = 16
@@ -2737,14 +2737,22 @@ local function setupKeybind()
 end
 
 -- ============================================================
--- STARTUP ANIMATION
+-- STARTUP ANIMATION (Optional - comment out if issues)
 -- ============================================================
+--[[
 MainFrame.Size = UDim2.new(0, 0, 0, 0)
 MainFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
 tween(MainFrame, {
     Size = UDim2.new(0, 560, 0, 520),
     Position = UDim2.new(0.5, -280, 0.5, -260)
 }, 0.5, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
+]]
+
+-- Force GUI to show immediately
+MainFrame.Size = UDim2.new(0, 560, 0, 520)
+MainFrame.Position = UDim2.new(0.5, -280, 0.5, -260)
+ScreenGui.Enabled = true
+MainFrame.Visible = true
 
 -- ============================================================
 -- INITIALIZE FIRST TAB

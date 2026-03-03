@@ -363,11 +363,50 @@ local function analyzeBuildBlocks(buildData)
     -- DEBUG: Show how many parts we're analyzing
     notify("oxyX Debug", "Analyzing " .. #buildData .. " parts...", 3)
     
+    -- DEBUG: Show sample of first part's keys
+    if #buildData > 0 and type(buildData[1]) == "table" then
+        local sampleKeys = ""
+        for k, v in pairs(buildData[1]) do
+            sampleKeys = sampleKeys .. tostring(k) .. "=" .. type(v) .. " "
+        end
+        notify("oxyX Debug", "Sample keys: " .. sampleKeys, 5)
+    end
+    
     for _, partData in ipairs(buildData) do
         if type(partData) == "table" then
-            -- Support multiple field names
-            local mat = partData.material or partData.Material or partData.Block or "SmoothPlastic"
-            local color = partData.color or partData.Color or partData.Colour or {r=163, g=162, b=165}
+            -- Try ALL possible field names for material
+            local mat = nil
+            
+            -- Check common field names (case insensitive)
+            local fieldsToCheck = {"Block", "Material", "material", "BLOCK", "MAT", "mat", "Type", "type", "b", "m"}
+            for _, field in ipairs(fieldsToCheck) do
+                if partData[field] ~= nil then
+                    mat = tostring(partData[field])
+                    break
+                end
+            end
+            
+            -- Default to SmoothPlastic if no material found
+            mat = mat or "SmoothPlastic"
+            
+            -- Try to find color info
+            local color = {r=163, g=162, b=165}
+            for _, field in ipairs({"Color", "color", "c", "Colour"}) do
+                if partData[field] ~= nil then
+                    if type(partData[field]) == "table" then
+                        color = partData[field]
+                    elseif type(partData[field]) == "string" then
+                        -- Try to parse hex color
+                        local hex = partData[field]:match("#?(%x%x%x%x%x%x)")
+                        if hex then
+                            color.r = tonumber(hex:sub(1,2), 16)
+                            color.g = tonumber(hex:sub(3,4), 16)
+                            color.b = tonumber(hex:sub(5,6), 16)
+                        end
+                    end
+                    break
+                end
+            end
             
             -- Find matching block from library
             local blockName = mat
@@ -407,6 +446,11 @@ local function analyzeBuildBlocks(buildData)
         count = count + 1
     end
     notify("oxyX Debug", "Found " .. count .. " block types: " .. debugBlocks, 5)
+    
+    -- Warning if only SmoothPlastic
+    if count == 1 and blockCounts["SmoothPlastic"] then
+        notify("oxyX Warning", "Only SmoothPlastic detected! File format might be wrong.", 5)
+    end
     
     -- Convert to sorted list
     for name, count in pairs(blockCounts) do

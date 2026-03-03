@@ -33,16 +33,81 @@ local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
 local HttpService = game:GetService("HttpService")
+local StarterGui = game:GetService("StarterGui")
+local Debris = game:GetService("Debris")
 
 local player = Players.LocalPlayer
 local mouse = player:GetMouse()
 
--- Try to get CoreGui, fallback to PlayerGui
-local CoreGui = game:GetService("CoreGui")
-local guiParent = CoreGui
-if not guiParent or not pcall(function() return guiParent.Parent end) then
-    guiParent = player:WaitForChild("PlayerGui", 10) or player:FindFirstChild("PlayerGui")
+-- Try multiple GUI parents with better detection
+local guiParent = nil
+local guiSource = "unknown"
+
+-- Method 1: Try CoreGui
+local success, CoreGui = pcall(game.GetService, game, "CoreGui")
+if success and CoreGui then
+    local testGui = Instance.new("ScreenGui")
+    testGui.Name = "oxyX_Test_" .. os.time()
+    local testOk = pcall(function()
+        testGui.Parent = CoreGui
+    end)
+    if testOk and testGui.Parent then
+        guiParent = CoreGui
+        guiSource = "CoreGui"
+        testGui:Destroy()
+    end
 end
+
+-- Method 2: Try PlayerGui
+if not guiParent then
+    local playerGui = player:WaitForChild("PlayerGui", 5)
+    if playerGui then
+        local testGui = Instance.new("ScreenGui")
+        testGui.Name = "oxyX_Test_" .. os.time()
+        local testOk = pcall(function()
+            testGui.Parent = playerGui
+        end)
+        if testOk and testGui.Parent then
+            guiParent = playerGui
+            guiSource = "PlayerGui"
+            testGui:Destroy()
+        end
+    end
+end
+
+-- Method 3: Try StarterGui (some executors)
+if not guiParent then
+    local testGui = Instance.new("ScreenGui")
+    testGui.Name = "oxyX_Test_" .. os.time()
+    local testOk = pcall(function()
+        testGui.Parent = StarterGui
+    end)
+    if testOk and testGui.Parent then
+        guiParent = StarterGui
+        guiSource = "StarterGui"
+        testGui:Destroy()
+    end
+end
+
+-- Ultimate fallback: create a ScreenGui and attach to player
+if not guiParent then
+    warn("[oxyX] Using fallback GUI method")
+    local fallbackGui = Instance.new("ScreenGui")
+    fallbackGui.Name = "oxyX_Fallback_" .. os.time()
+    pcall(function()
+        fallbackGui.Parent = player:WaitForChild("PlayerGui", 10)
+    end)
+    if fallbackGui.Parent then
+        guiParent = fallbackGui.Parent
+        guiSource = "PlayerGui (fallback)"
+    else
+        -- Just set to playerGui directly
+        guiParent = player:FindFirstChild("PlayerGui") or player:WaitForChild("PlayerGui")
+        guiSource = "PlayerGui (direct)"
+    end
+end
+
+print("[oxyX] GUI Parent: " .. guiSource)
 
 -- ============================================================
 -- UTILITY FUNCTIONS
@@ -400,22 +465,58 @@ end
 -- GUI CREATION
 -- ============================================================
 -- Destroy existing GUI
-local existingGui = guiParent:FindFirstChild("oxyX_BABFT")
+local existingGui = nil
+pcall(function() existingGui = guiParent:FindFirstChild("oxyX_BABFT") end)
 if existingGui then pcall(function() existingGui:Destroy() end) end
-local existingNotif = guiParent:FindFirstChild("oxyX_Notif")
+
+local existingNotif = nil
+pcall(function() existingNotif = guiParent:FindFirstChild("oxyX_Notif") end)
 if existingNotif then pcall(function() existingNotif:Destroy() end) end
 
+-- Create ScreenGui with error handling
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "oxyX_BABFT"
 ScreenGui.ResetOnSpawn = false
 ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 ScreenGui.IgnoreGuiInset = true
 
-local guiCreated = pcall(function()
-    ScreenGui.Parent = guiParent
-end)
+-- Try to set parent with error handling
+local guiCreated = false
+local guiError = nil
+
+-- Try current guiParent
+if guiParent then
+    guiCreated, guiError = pcall(function()
+        ScreenGui.Parent = guiParent
+    end)
+end
+
+-- If failed, try PlayerGui
 if not guiCreated or not ScreenGui.Parent then
-    ScreenGui.Parent = player.PlayerGui
+    local playerGui = player:FindFirstChild("PlayerGui")
+    if playerGui then
+        guiCreated, guiError = pcall(function()
+            ScreenGui.Parent = playerGui
+        end)
+        if guiCreated then
+            guiParent = playerGui
+            guiSource = "PlayerGui (fallback)"
+        end
+    end
+end
+
+-- If still failed, warn user
+if not guiCreated or not ScreenGui.Parent then
+    warn("[oxyX] Failed to create GUI: " .. tostring(guiError))
+    -- Try one more time with StarterGui
+    pcall(function()
+        ScreenGui.Parent = StarterGui
+    end)
+end
+
+-- Verify GUI was created
+if not ScreenGui.Parent then
+    error("[oxyX] CRITICAL: Could not create GUI! Please report this error.")
 end
 
 -- ============================================================

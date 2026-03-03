@@ -338,55 +338,56 @@ end
 
 -- ============================================================
 -- BABFT BLOCK LIBRARY - Complete list of BABFT blocks
+-- Note: BABFT .build files use "Block" field with block names directly!
 -- ============================================================
 local blockLibrary = {
-    -- Basic blocks (all players have these)
-    {name = "Smooth Plastic", material = "SmoothPlastic", color = {r=163, g=162, b=165}, unlocked = true},
-    {name = "Wood", material = "Wood", color = {r=163, g=162, b=165}, unlocked = true},
-    {name = "Wood Plank", material = "Wood", color = {r=143, g=130, b=100}, unlocked = true},
-    {name = "Metal", material = "Metal", color = {r=192, g=192, b=192}, unlocked = true},
-    {name = "Concrete", material = "Slate", color = {r=100, g=100, b=100}, unlocked = true},
-    {name = "Brick", material = "Brick", color = {r=196, g=40, b=28}, unlocked = true},
-    {name = "Ice", material = "Ice", color = {r=133, g=133, b=163}, unlocked = true},
-    {name = "Neon", material = "Neon", color = {r=0, g=255, b=255}, unlocked = true},
-    {name = "Gold", material = "DiamondPlate", color = {r=212, g=175, b=55}, unlocked = true},
-    {name = "Grass", material = "Grass", color = {r=67, g=205, b=128}, unlocked = true},
-    {name = "Sand", material = "Sand", color = {r=237, g=201, b=175}, unlocked = true},
-    {name = "Stone", material = "Cobblestone", color = {r=128, g=128, b=128}, unlocked = true},
+    -- Basic blocks (all players have these) - include both with/without space
+    {name = "Smooth Plastic", material = "SmoothPlastic", color = {r=163, g=162, b=165}, unlocked = true, aliases = {"SmoothPlastic", "Smooth Plastic"}},
+    {name = "Wood", material = "Wood", color = {r=163, g=162, b=165}, unlocked = true, aliases = {"Wood", "wood"}},
+    {name = "Wood Plank", material = "Wood", color = {r=143, g=130, b=100}, unlocked = true, aliases = {"Wood Plank", "WoodPlank"}},
+    {name = "Metal", material = "Metal", color = {r=192, g=192, b=192}, unlocked = true, aliases = {"Metal", "metal"}},
+    {name = "Concrete", material = "Slate", color = {r=100, g=100, b=100}, unlocked = true, aliases = {"Concrete", "concrete"}},
+    {name = "Brick", material = "Brick", color = {r=196, g=40, b=28}, unlocked = true, aliases = {"Brick", "brick"}},
+    {name = "Ice", material = "Ice", color = {r=133, g=133, b=163}, unlocked = true, aliases = {"Ice", "ice"}},
+    {name = "Neon", material = "Neon", color = {r=0, g=255, b=255}, unlocked = true, aliases = {"Neon", "neon"}},
+    {name = "Gold", material = "DiamondPlate", color = {r=212, g=175, b=55}, unlocked = true, aliases = {"Gold", "gold", "DiamondPlate"}},
+    {name = "Grass", material = "Grass", color = {r=67, g=205, b=128}, unlocked = true, aliases = {"Grass", "grass"}},
+    {name = "Sand", material = "Sand", color = {r=237, g=201, b=175}, unlocked = true, aliases = {"Sand", "sand"}},
+    {name = "Stone", material = "Cobblestone", color = {r=128, g=128, b=128}, unlocked = true, aliases = {"Stone", "stone", "Cobblestone"}}
     
     -- Premium blocks
-    {name = "Marble", material = "Marble", color = {r=230, g=225, b=220}, unlocked = false},
-    {name = "Granite", material = "Granite", color = {r=140, g=140, b=140}, unlocked = false},
-    {name = "Obsidian", material = "Obsidian", color = {r=30, g=30, b=35}, unlocked = false},
-    {name = "Cinderblock", material = "Cinderblock", color = {r=90, g=90, b=90}, unlocked = false},
-    {name = "Corrosion", material = "Corrosion", color = {r=100, g=120, b=80}, unlocked = false},
-    {name = "Diamond Plate", material = "DiamondPlate", color = {r=180, g=180, b=190}, unlocked = false},
-    {name = "Foil", material = "Foil", color = {r=200, g=200, b=210}, unlocked = false},
-    {name = "Pearl", material = "Pearl", color = {r=230, g=230, b=235}, unlocked = false},
-    {name = "Plaster", material = "Plaster", color = {r=220, g=215, b=205}, unlocked = false},
+    {name = "Marble", material = "Marble", color = {r=230, g=225, b=220}, unlocked = false, aliases = {"Marble", "marble"}},
+    {name = "Granite", material = "Granite", color = {r=140, g=140, b=140}, unlocked = false, aliases = {"Granite", "granite"}},
+    {name = "Obsidian", material = "Obsidian", color = {r=30, g=30, b=35}, unlocked = false, aliases = {"Obsidian", "obsidian"}},
+    {name = "Cinderblock", material = "Cinderblock", color = {r=90, g=90, b=90}, unlocked = false, aliases = {"Cinderblock", "cinderblock", "Cinder Block"}},
+    {name = "Corrosion", material = "Corrosion", color = {r=100, g=120, b=80}, unlocked = false, aliases = {"Corrosion", "corrosion"}},
+    {name = "Diamond Plate", material = "DiamondPlate", color = {r=180, g=180, b=190}, unlocked = false, aliases = {"Diamond Plate", "DiamondPlate", "diamondplate"}},
+    {name = "Foil", material = "Foil", color = {r=200, g=200, b=210}, unlocked = false, aliases = {"Foil", "foil"}},
+    {name = "Pearl", material = "Pearl", color = {r=230, g=230, b=235}, unlocked = false, aliases = {"Pearl", "pearl"}},
+    {name = "Plaster", material = "Plaster", color = {r=220, g=215, b=205}, unlocked = false, aliases = {"Plaster", "plaster"}},
     
     -- Neon colors
-    {name = "Neon Pink", material = "Neon", color = {r=255, g=0, b=127}, unlocked = false},
-    {name = "Neon Green", material = "Neon", color = {r=50, g=255, b=50}, unlocked = false},
-    {name = "Neon Blue", material = "Neon", color = {r=0, g=150, b=255}, unlocked = false},
-    {name = "Neon Red", material = "Neon", color = {r=255, g=50, b=50}, unlocked = false},
-    {name = "Neon Orange", material = "Neon", color = {r=255, g=150, b=0}, unlocked = false},
-    {name = "Neon Purple", material = "Neon", color = {r=180, g=50, b=255}, unlocked = false},
+    {name = "Neon Pink", material = "Neon", color = {r=255, g=0, b=127}, unlocked = false, aliases = {"Neon Pink", "NeonPink", "neon pink"}},
+    {name = "Neon Green", material = "Neon", color = {r=50, g=255, b=50}, unlocked = false, aliases = {"Neon Green", "NeonGreen", "neon green"}},
+    {name = "Neon Blue", material = "Neon", color = {r=0, g=150, b=255}, unlocked = false, aliases = {"Neon Blue", "NeonBlue", "neon blue"}},
+    {name = "Neon Red", material = "Neon", color = {r=255, g=50, b=50}, unlocked = false, aliases = {"Neon Red", "NeonRed", "neon red"}},
+    {name = "Neon Orange", material = "Neon", color = {r=255, g=150, b=0}, unlocked = false, aliases = {"Neon Orange", "NeonOrange", "neon orange"}},
+    {name = "Neon Purple", material = "Neon", color = {r=180, g=50, b=255}, unlocked = false, aliases = {"Neon Purple", "NeonPurple", "neon purple"}},
     
     -- Additional BABFT-specific blocks (by color)
-    {name = "Brown", material = "Wood", color = {r=139, g=69, b=19}, unlocked = true},
-    {name = "Tan", material = "Wood", color = {r=210, g=180, b=140}, unlocked = true},
-    {name = "Light Stone", material = "Slate", color = {r=160, g=160, b=160}, unlocked = true},
-    {name = "Dark Stone", material = "Slate", color = {r=80, g=80, b=80}, unlocked = true},
-    {name = "Red", material = "Brick", color = {r=196, g=40, b=28}, unlocked = true},
-    {name = "Blue", material = "Brick", color = {r=13, g=105, b=172}, unlocked = true},
-    {name = "Yellow", material = "Brick", color = {r=255, g=198, b=38}, unlocked = true},
-    {name = "Green", material = "Brick", color = {r=75, g=151, b=75}, unlocked = true},
-    {name = "White", material = "SmoothPlastic", color = {r=242, g=242, b=242}, unlocked = true},
-    {name = "Black", material = "SmoothPlastic", color = {r=17, g=17, b=17}, unlocked = true},
-    {name = "Gray", material = "SmoothPlastic", color = {r=128, g=128, b=128}, unlocked = true},
-    {name = "Light Gray", material = "SmoothPlastic", color = {r=191, g=191, b=191}, unlocked = true},
-    {name = "Dark Gray", material = "SmoothPlastic", color = {r=64, g=64, b=64}, unlocked = true},
+    {name = "Brown", material = "Wood", color = {r=139, g=69, b=19}, unlocked = true, aliases = {"Brown", "brown"}},
+    {name = "Tan", material = "Wood", color = {r=210, g=180, b=140}, unlocked = true, aliases = {"Tan", "tan"}},
+    {name = "Light Stone", material = "Slate", color = {r=160, g=160, b=160}, unlocked = true, aliases = {"Light Stone", "LightStone", "light stone"}},
+    {name = "Dark Stone", material = "Slate", color = {r=80, g=80, b=80}, unlocked = true, aliases = {"Dark Stone", "DarkStone", "dark stone"}},
+    {name = "Red", material = "Brick", color = {r=196, g=40, b=28}, unlocked = true, aliases = {"Red", "red"}},
+    {name = "Blue", material = "Brick", color = {r=13, g=105, b=172}, unlocked = true, aliases = {"Blue", "blue"}},
+    {name = "Yellow", material = "Brick", color = {r=255, g=198, b=38}, unlocked = true, aliases = {"Yellow", "yellow"}},
+    {name = "Green", material = "Brick", color = {r=75, g=151, b=75}, unlocked = true, aliases = {"Green", "green"}},
+    {name = "White", material = "SmoothPlastic", color = {r=242, g=242, b=242}, unlocked = true, aliases = {"White", "white"}},
+    {name = "Black", material = "SmoothPlastic", color = {r=17, g=17, b=17}, unlocked = true, aliases = {"Black", "black"}},
+    {name = "Gray", material = "SmoothPlastic", color = {r=128, g=128, b=128}, unlocked = true, aliases = {"Gray", "gray", "Grey"}},
+    {name = "Light Gray", material = "SmoothPlastic", color = {r=191, g=191, b=191}, unlocked = true, aliases = {"Light Gray", "LightGray", "light gray", "Light Grey"}},
+    {name = "Dark Gray", material = "SmoothPlastic", color = {r=64, g=64, b=64}, unlocked = true, aliases = {"Dark Gray", "DarkGray", "dark gray", "Dark Grey"}},
 }
 
 -- Function to analyze build and find required blocks
@@ -428,7 +429,8 @@ local function analyzeBuildBlocks(buildData)
             local mat = nil
             
             -- Priority order for field names (most common first)
-            local fieldsToCheck = {"Block", "b", "Material", "mat", "BLOCK", "MAT", "Type", "type", "m"}
+            -- BABFT .build files use "Block" or "b" with actual BABFT block names!
+            local fieldsToCheck = {"Block", "b", "BLOCK", "B", "Material", "mat", "BLOCK", "MAT", "Type", "type", "m"}
             for _, field in ipairs(fieldsToCheck) do
                 if partData[field] ~= nil then
                     mat = tostring(partData[field])
@@ -436,8 +438,26 @@ local function analyzeBuildBlocks(buildData)
                 end
             end
             
-            -- Default to SmoothPlastic if no material found
-            mat = mat or "SmoothPlastic"
+            -- If we got a BABFT block name (like "SmoothPlastic", "Wood"), use it directly
+            -- Don't try to match it as a material - BABFT block names ARE the block names!
+            if mat and mat ~= "" and mat ~= "SmoothPlastic" then
+                -- Check if it's already a valid BABFT block name
+                local isKnownBlock = false
+                for _, block in ipairs(blockLibrary) do
+                    if block.name:lower() == mat:lower() then
+                        mat = block.name  -- Use the proper name from library
+                        isKnownBlock = true
+                        break
+                    end
+                end
+                -- If not found in library, still use the raw name (might be valid BABFT block)
+                if not isKnownBlock then
+                    -- Capitalize first letter for unknown blocks
+                    mat = mat:sub(1,1):upper() .. mat:sub(2):lower()
+                end
+            else
+                mat = mat or "SmoothPlastic"
+            end
             
             -- Try to find color info (for additional matching)
             local color = {r=163, g=162, b=165}
@@ -457,20 +477,47 @@ local function analyzeBuildBlocks(buildData)
                 end
             end
             
-            -- FLEXIBLE BLOCK MATCHING: First try exact material name match, then color match
-            local blockName = mat  -- Default to material name
+            -- FLEXIBLE BLOCK MATCHING: First try exact block name match (BABFT uses direct names!)
+            local blockName = mat  -- mat now contains the BABFT block name directly!
             local found = false
             
-            -- Method 1: Exact match on material name
+            -- Method 1: Exact match on block name (BABFT block names like "Smooth Plastic", "Wood", etc)
             for _, block in ipairs(blockLibrary) do
-                if block.material:lower() == mat:lower() then
+                if block.name:lower() == mat:lower() then
                     blockName = block.name
                     found = true
                     break
                 end
             end
             
-            -- Method 2: If no exact match, try color matching
+            -- Method 1b: Check aliases (e.g., "SmoothPlastic" -> "Smooth Plastic")
+            if not found then
+                for _, block in ipairs(blockLibrary) do
+                    if block.aliases then
+                        for _, alias in ipairs(block.aliases) do
+                            if alias:lower() == mat:lower() then
+                                blockName = block.name
+                                found = true
+                                break
+                            end
+                        end
+                    end
+                    if found then break end
+                end
+            end
+            
+            -- Method 2: If no exact match, try material name matching
+            if not found then
+                for _, block in ipairs(blockLibrary) do
+                    if block.material:lower() == mat:lower() then
+                        blockName = block.name
+                        found = true
+                        break
+                    end
+                end
+            end
+            
+            -- Method 3: If still no match, try color matching
             if not found then
                 local colorR = color.r or color.R or 163
                 local colorG = color.g or color.G or 162

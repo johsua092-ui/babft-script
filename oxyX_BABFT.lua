@@ -109,6 +109,113 @@ end
 -- ============================================================
 -- WORKSPACE FILE BROWSER HELPER
 -- ============================================================
+-- ============================================================
+-- WORKSPACE FILE WRITER (for uploading files)
+-- ============================================================
+local function writeWorkspaceFile(path, content)
+    local success = false
+    pcall(function()
+        if writefile then
+            writefile(path, content)
+            success = true
+        end
+    end)
+    return success
+end
+
+-- ============================================================
+-- BLOCK LIBRARY SYSTEM
+-- ============================================================
+-- Define available blocks in Roblox (material -> color info)
+local blockLibrary = {
+    -- Basic blocks
+    {name = "SmoothPlastic", material = "SmoothPlastic", color = {r=163, g=162, b=165}, unlocked = true},
+    {name = "Wood", material = "Wood", color = {r=163, g=162, b=165}, unlocked = true},
+    {name = "Wood Plank", material = "Wood", color = {r=143, g=130, b=100}, unlocked = true},
+    {name = "Metal", material = "Metal", color = {r=192, g=192, b=192}, unlocked = true},
+    {name = "Concrete", material = "Slate", color = {r=100, g=100, b=100}, unlocked = true},
+    {name = "Brick", material = "Brick", color = {r=196, g=40, b=28}, unlocked = true},
+    {name = "Ice", material = "Ice", color = {r=133, g=133, b=163}, unlocked = true},
+    {name = "Neon", material = "Neon", color = {r=0, g=255, b=255}, unlocked = true},
+    {name = "Gold", material = "DiamondPlate", color = {r=212, g=175, b=55}, unlocked = true},
+    {name = "Grass", material = "Grass", color = {r=67, g=205, b=128}, unlocked = true},
+    {name = "Sand", material = "Sand", color = {r=237, g=201, b=175}, unlocked = true},
+    {name = "Stone", material = "Cobblestone", color = {r=128, g=128, b=128}, unlocked = true},
+    {name = "Marble", material = "Marble", color = {r=230, g=225, b=220}, unlocked = false},
+    {name = "Granite", material = "Granite", color = {r=140, g=140, b=140}, unlocked = false},
+    {name = "Obsidian", material = "Obsidian", color = {r=30, g=30, b=35}, unlocked = false},
+    {name = "Cinderblock", material = "Cinderblock", color = {r=90, g=90, b=90}, unlocked = false},
+    {name = "Corrosion", material = "Corrosion", color = {r=100, g=120, b=80}, unlocked = false},
+    {name = "DiamondPlate", material = "DiamondPlate", color = {r=180, g=180, b=190}, unlocked = false},
+    {name = "Foil", material = "Foil", color = {r=200, g=200, b=210}, unlocked = false},
+    {name = "Pearl", material = "Pearl", color = {r=230, g=230, b=235}, unlocked = false},
+    {name = "Plaster", material = "Plaster", color = {r=220, g=215, b=205}, unlocked = false},
+    {name = "Neon Pink", material = "Neon", color = {r=255, g=0, b=127}, unlocked = false},
+    {name = "Neon Green", material = "Neon", color = {r=50, g=255, b=50}, unlocked = false},
+    {name = "Neon Blue", material = "Neon", color = {r=0, g=150, b=255}, unlocked = false},
+    {name = "Neon Red", material = "Neon", color = {r=255, g=50, b=50}, unlocked = false},
+    {name = "Neon Orange", material = "Neon", color = {r=255, g=150, b=0}, unlocked = false},
+    {name = "Neon Purple", material = "Neon", color = {r=180, g=50, b=255}, unlocked = false},
+}
+
+-- Function to analyze build and find required blocks
+local function analyzeBuildBlocks(buildData)
+    local requiredBlocks = {}
+    local blockCounts = {}
+    
+    for _, partData in ipairs(buildData) do
+        if type(partData) == "table" then
+            local mat = partData.material or partData.Material or "SmoothPlastic"
+            local color = partData.color or partData.Color or {r=163, g=162, b=165}
+            
+            -- Find matching block from library
+            local blockName = mat
+            for _, block in ipairs(blockLibrary) do
+                if block.material:lower() == mat:lower() then
+                    local colorMatch = math.abs(block.color.r - (color.r or color.R or 163)) < 20
+                        and math.abs(block.color.g - (color.g or color.G or 162)) < 20
+                        and math.abs(block.color.b - (color.b or color.B or 165)) < 20
+                    if colorMatch then
+                        blockName = block.name
+                        break
+                    end
+                end
+            end
+            
+            blockCounts[blockName] = (blockCounts[blockName] or 0) + 1
+        end
+    end
+    
+    -- Convert to sorted list
+    for name, count in pairs(blockCounts) do
+        table.insert(requiredBlocks, {name = name, count = count})
+    end
+    table.sort(requiredBlocks, function(a, b) return a.count > b.count end)
+    
+    return requiredBlocks
+end
+
+-- Function to find missing (locked) blocks
+local function findMissingBlocks(requiredBlocks)
+    local missing = {}
+    for _, req in ipairs(requiredBlocks) do
+        local found = false
+        for _, block in ipairs(blockLibrary) do
+            if block.name:lower() == req.name:lower() and block.unlocked then
+                found = true
+                break
+            end
+        end
+        if not found then
+            table.insert(missing, req)
+        end
+    end
+    return missing
+end
+
+-- ============================================================
+-- WORKSPACE FILE BROWSER HELPER
+-- ============================================================
 -- Lists files in executor workspace filtered by extension
 local function listWorkspaceFiles(ext)
     local files = {}
@@ -169,8 +276,8 @@ if not ScreenGui.Parent then ScreenGui.Parent = player.PlayerGui end
 -- ============================================================
 local MainFrame = Instance.new("Frame", ScreenGui)
 MainFrame.Name = "MainFrame"
-MainFrame.Size = UDim2.new(0, 560, 0, 520)
-MainFrame.Position = UDim2.new(0.5, -280, 0.5, -260)
+MainFrame.Size = UDim2.new(0, 560, 0, 680)
+MainFrame.Position = UDim2.new(0.5, -280, 0.5, -340)
 MainFrame.BackgroundColor3 = Color3.fromRGB(10, 10, 18)
 MainFrame.BorderSizePixel = 0
 MainFrame.ClipsDescendants = true
@@ -214,7 +321,7 @@ local TitleLabel = Instance.new("TextLabel", TitleBar)
 TitleLabel.Size = UDim2.new(1, -100, 1, 0)
 TitleLabel.Position = UDim2.new(0, 14, 0, 0)
 TitleLabel.BackgroundTransparency = 1
-TitleLabel.Text = "⚡ oxyX BABFT Suite v2.0"
+TitleLabel.Text = "⚡ oxyX BABFT Suite v2.1"
 TitleLabel.TextColor3 = Color3.fromRGB(200, 150, 255)
 TitleLabel.Font = Enum.Font.GothamBold
 TitleLabel.TextSize = 16
@@ -706,8 +813,8 @@ local function createFileSelector(parent, ext, posY, labelText, accentColor)
         notify("oxyX", "Refreshed " .. ext .. " file list!", 2)
     end)
 
-    -- Returns: selectedPath table, dropFrame (so caller can offset below it), selLbl
-    return selectedPath, dropFrame, selLbl
+    -- Returns: selectedPath table, dropFrame (so caller can offset below it), selLbl, refreshBtn
+    return selectedPath, dropFrame, selLbl, refreshBtn
 end
 
 -- ============================================================
@@ -758,28 +865,365 @@ local p1 = tabPages[1]
 createLabel(p1, "📂 Select a .build file from your workspace:", 0, 18, Color3.fromRGB(160, 120, 220))
 createLabel(p1, "Only .build files are shown (e.g. ocd.build)", 18, 14, Color3.fromRGB(100, 80, 150))
 
+-- File Upload Section
+local uploadY = 36
+createLabel(p1, "📤 Upload a .build file to workspace:", uploadY, 18, Color3.fromRGB(160, 120, 220))
+
+-- Upload input
+local uploadInput = Instance.new("TextBox", p1)
+uploadInput.Size = UDim2.new(1, -100, 0, 30)
+uploadInput.Position = UDim2.new(0, 0, 0, uploadY + 22)
+uploadInput.BackgroundColor3 = Color3.fromRGB(20, 15, 38)
+uploadInput.BorderSizePixel = 0
+
+uploadInput.Text = "Paste file content here..."
+uploadInput.TextColor3 = Color3.fromRGB(100, 80, 140)
+uploadInput.Font = Enum.Font.Gotham
+uploadInput.TextSize = 11
+
+local uploadCorner = Instance.new("UICorner", uploadInput)
+uploadCorner.CornerRadius = UDim.new(0, 6)
+
+local uploadStroke = Instance.new("UIStroke", uploadInput)
+uploadStroke.Color = Color3.fromRGB(70, 40, 130)
+uploadStroke.Thickness = 1
+
+-- Filename input
+local fileNameInput = Instance.new("TextBox", p1)
+fileNameInput.Size = UDim2.new(0, 150, 0, 30)
+fileNameInput.Position = UDim2.new(1, -155, 0, uploadY + 22)
+fileNameInput.BackgroundColor3 = Color3.fromRGB(20, 15, 38)
+fileNameInput.BorderSizePixel = 0
+fileNameInput.Text = "mybuild.build"
+fileNameInput.TextColor3 = Color3.fromRGB(160, 160, 180)
+fileNameInput.Font = Enum.Font.Gotham
+fileNameInput.TextSize = 11
+
+local fnCorner = Instance.new("UICorner", fileNameInput)
+fnCorner.CornerRadius = UDim.new(0, 6)
+
+local fnStroke = Instance.new("UIStroke", fileNameInput)
+fnStroke.Color = Color3.fromRGB(70, 40, 130)
+fnStroke.Thickness = 1
+
+-- Upload button
+local uploadBtn = Instance.new("TextButton", p1)
+uploadBtn.Size = UDim2.new(0, 100, 0, 30)
+uploadBtn.Position = UDim2.new(0, 0, 0, uploadY + 58)
+uploadBtn.BackgroundColor3 = Color3.fromRGB(80, 60, 140)
+uploadBtn.Text = "💾 Upload"
+uploadBtn.TextColor3 = Color3.fromRGB(220, 200, 255)
+uploadBtn.Font = Enum.Font.GothamBold
+uploadBtn.TextSize = 12
+uploadBtn.BorderSizePixel = 0
+
+uploadBtn.MouseButton1Click:Connect(function()
+    local content = uploadInput.Text
+    local fileName = fileNameInput.Text
+    
+    if not content or content == "" or content == "Paste file content here..." then
+        notify("oxyX BABFT", "Please paste file content first!", 3)
+        return
+    end
+    
+    if not fileName or fileName == "" then
+        notify("oxyX BABFT", "Please enter a filename!", 3)
+        return
+    end
+    
+    if not fileName:lower():match("%.build$") then
+        fileName = fileName .. ".build"
+    end
+    
+    if writeWorkspaceFile(fileName, content) then
+        notify("oxyX BABFT", "File uploaded: " .. fileName, 3)
+        -- Refresh file list
+        if refreshFileList then refreshFileList() end
+    else
+        notify("oxyX BABFT", "Failed to upload file!", 3)
+    end
+end)
+
+local upCorner = Instance.new("UICorner", uploadBtn)
+upCorner.CornerRadius = UDim.new(0, 6)
+
 -- File selector for .build
-local buildFileSelected, buildDropFrame, buildSelLbl = createFileSelector(
-    p1, ".build", 36,
+local buildFileSelected, buildDropFrame, buildSelLbl, buildRefreshBtn = createFileSelector(
+    p1, ".build", uploadY + 100,
     "📁 Workspace .build Files:",
     Color3.fromRGB(100, 50, 220)
 )
 
--- Dynamic Y offset after dropdown (dropdown max height ~140)
-local buildControlsY = 36 + 22 + 34 + 145  -- label + selBg + dropdown max + padding
+-- Refresh file list when clicking refresh button
+if buildRefreshBtn then
+    buildRefreshBtn.MouseButton1Click:Connect(function()
+        task.delay(0.2, updatePreviewAndBlockList)
+    end)
+end
 
-createLabel(p1, "⚙️ Build Speed (studs/sec):", buildControlsY, 16, Color3.fromRGB(160, 120, 220))
+-- Dynamic Y offset after dropdown (dropdown max height ~140)
+local buildControlsY = uploadY + 100 + 22 + 34 + 145  -- label + selBg + dropdown max + padding
+
+-- ============================================================
+-- BUILD PREVIEW SECTION
+-- ============================================================
+createLabel(p1, "🔍 Build Preview:", buildControlsY, 18, Color3.fromRGB(160, 120, 220))
+
+-- Preview container
+local previewContainer = Instance.new("Frame", p1)
+previewContainer.Size = UDim2.new(1, -10, 0, 120)
+previewContainer.Position = UDim2.new(0, 5, 0, buildControlsY + 22)
+previewContainer.BackgroundColor3 = Color3.fromRGB(15, 12, 28)
+previewContainer.BorderSizePixel = 0
+
+local previewCorner = Instance.new("UICorner", previewContainer)
+previewCorner.CornerRadius = UDim.new(0, 8)
+
+local previewStroke = Instance.new("UIStroke", previewContainer)
+previewStroke.Color = Color3.fromRGB(70, 40, 130)
+previewStroke.Thickness = 1
+
+-- Preview info label
+local previewInfo = Instance.new("TextLabel", previewContainer)
+previewInfo.Size = UDim2.new(1, -10, 0, 20)
+previewInfo.Position = UDim2.new(0, 5, 0, 5)
+previewInfo.BackgroundTransparency = 1
+previewInfo.Text = "Select a .build file to see preview"
+previewInfo.TextColor3 = Color3.fromRGB(100, 80, 140)
+previewInfo.Font = Enum.Font.Gotham
+previewInfo.TextSize = 11
+previewInfo.TextXAlignment = Enum.TextXAlignment.Left
+
+-- Preview scroll for parts
+local previewScroll = Instance.new("ScrollingFrame", previewContainer)
+previewScroll.Size = UDim2.new(1, -10, 0, 70)
+previewScroll.Position = UDim2.new(0, 5, 0, 30)
+previewScroll.BackgroundTransparency = 1
+previewScroll.ScrollBarThickness = 3
+previewScroll.ScrollBarImageColor3 = Color3.fromRGB(100, 50, 220)
+previewScroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
+
+local previewLayout = Instance.new("UIListLayout", previewScroll)
+previewLayout.SortOrder = Enum.SortOrder.LayoutOrder
+previewLayout.Padding = UDim.new(0, 2)
+
+-- Preview canvas for simple visualization
+local previewCanvas = Instance.new("Frame", previewContainer)
+previewCanvas.Size = UDim2.new(0, 60, 0, 60)
+previewCanvas.Position = UDim2.new(1, -70, 0.5, -30)
+previewCanvas.BackgroundColor3 = Color3.fromRGB(30, 25, 50)
+previewCanvas.BorderSizePixel = 0
+
+local canvasCorner = Instance.new("UICorner", previewCanvas)
+canvasCorner.CornerRadius = UDim.new(0, 8)
+
+local canvasLabel = Instance.new("TextLabel", previewCanvas)
+canvasLabel.Size = UDim2.new(1, 0, 1, 0)
+canvasLabel.BackgroundTransparency = 1
+canvasLabel.Text = "📦"
+canvasLabel.TextColor3 = Color3.fromRGB(160, 120, 220)
+canvasLabel.Font = Enum.Font.GothamBold
+canvasLabel.TextSize = 24
+
+local previewPartCount = Instance.new("TextLabel", previewCanvas)
+previewPartCount.Size = UDim2.new(1, 0, 0, 15)
+previewPartCount.Position = UDim2.new(0, 0, 1, -15)
+previewPartCount.BackgroundTransparency = 1
+previewPartCount.Text = "0 parts"
+previewPartCount.TextColor3 = Color3.fromRGB(180, 180, 200)
+previewPartCount.Font = Enum.Font.Gotham
+previewPartCount.TextSize = 9
+
+-- ============================================================
+-- BLOCK LIST SECTION
+-- ============================================================
+local blockListY = buildControlsY + 150
+createLabel(p1, "🧱 Required Blocks:", blockListY, 18, Color3.fromRGB(160, 120, 220))
+
+-- Block list container
+local blockListContainer = Instance.new("Frame", p1)
+blockListContainer.Size = UDim2.new(1, -10, 0, 100)
+blockListContainer.Position = UDim2.new(0, 5, 0, blockListY + 22)
+blockListContainer.BackgroundColor3 = Color3.fromRGB(15, 12, 28)
+blockListContainer.BorderSizePixel = 0
+
+local blCorner = Instance.new("UICorner", blockListContainer)
+blCorner.CornerRadius = UDim.new(0, 8)
+
+local blStroke = Instance.new("UIStroke", blockListContainer)
+blStroke.Color = Color3.fromRGB(70, 40, 130)
+blStroke.Thickness = 1
+
+-- Block list scroll
+local blockListScroll = Instance.new("ScrollingFrame", blockListContainer)
+blockListScroll.Size = UDim2.new(1, -10, 1, -10)
+blockListScroll.Position = UDim2.new(0, 5, 0, 5)
+blockListScroll.BackgroundTransparency = 1
+blockListScroll.ScrollBarThickness = 3
+blockListScroll.ScrollBarImageColor3 = Color3.fromRGB(100, 50, 220)
+blockListScroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
+
+local blockListLayout = Instance.new("UIListLayout", blockListScroll)
+blockListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+blockListLayout.Padding = UDim.new(0, 2)
+
+-- Function to update preview and block list
+local currentBuildData = nil
+
+local function updatePreviewAndBlockList()
+    -- Clear preview
+    for _, child in ipairs(previewScroll:GetChildren()) do
+        if child:IsA("TextLabel") or child:IsA("Frame") then
+            child:Destroy()
+        end
+    end
+    
+    -- Clear block list
+    for _, child in ipairs(blockListScroll:GetChildren()) do
+        if child:IsA("TextLabel") or child:IsA("Frame") then
+            child:Destroy()
+        end
+    end
+    
+    if not buildFileSelected.value then
+        previewInfo.Text = "Select a .build file to see preview"
+        previewPartCount.Text = "0 parts"
+        return
+    end
+    
+    -- Read file
+    local raw = readWorkspaceFile(buildFileSelected.value)
+    if not raw or raw == "" then
+        previewInfo.Text = "Could not read file!"
+        previewPartCount.Text = "Error"
+        return
+    end
+    
+    -- Parse build data
+    currentBuildData = parseBuildData(raw)
+    if not currentBuildData or #currentBuildData == 0 then
+        previewInfo.Text = "Invalid build data!"
+        previewPartCount.Text = "Error"
+        return
+    end
+    
+    -- Update preview info
+    previewInfo.Text = "📄 " .. buildFileSelected.name .. " - " .. #currentBuildData .. " parts"
+    previewPartCount.Text = #currentBuildData .. " parts"
+    
+    -- Show first few parts in preview
+    local maxPreview = 5
+    for i = 1, math.min(#currentBuildData, maxPreview) do
+        local partData = currentBuildData[i]
+        if type(partData) == "table" then
+            local pos = partData.position or partData.Position or {x=0, y=0, z=0}
+            local mat = partData.material or partData.Material or "SmoothPlastic"
+            
+            local partLbl = Instance.new("TextLabel", previewScroll)
+            partLbl.Size = UDim2.new(1, 0, 0, 18)
+            partLbl.BackgroundTransparency = 1
+            partLbl.Text = "  Part " .. i .. ": " .. mat .. " at (" .. (pos.x or pos.X or 0) .. ", " .. (pos.y or pos.Y or 0) .. ", " .. (pos.z or pos.Z or 0) .. ")"
+            partLbl.TextColor3 = Color3.fromRGB(180, 180, 200)
+            partLbl.Font = Enum.Font.Gotham
+            partLbl.TextSize = 10
+            partLbl.TextXAlignment = Enum.TextXAlignment.Left
+        end
+    end
+    
+    if #currentBuildData > maxPreview then
+        local moreLbl = Instance.new("TextLabel", previewScroll)
+        moreLbl.Size = UDim2.new(1, 0, 0, 18)
+        moreLbl.BackgroundTransparency = 1
+        moreLbl.Text = "  ... and " .. (#currentBuildData - maxPreview) .. " more parts"
+        moreLbl.TextColor3 = Color3.fromRGB(100, 80, 140)
+        moreLbl.Font = Enum.Font.Gotham
+        moreLbl.TextSize = 10
+        moreLbl.TextXAlignment = Enum.TextXAlignment.Left
+    end
+    
+    -- Analyze blocks
+    local requiredBlocks = analyzeBuildBlocks(currentBuildData)
+    local missingBlocks = findMissingBlocks(requiredBlocks)
+    
+    -- Show required blocks
+    for _, block in ipairs(requiredBlocks) do
+        local isMissing = false
+        for _, missing in ipairs(missingBlocks) do
+            if missing.name == block.name then
+                isMissing = true
+                break
+            end
+        end
+        
+        local blockFrame = Instance.new("Frame", blockListScroll)
+        blockFrame.Size = UDim2.new(1, 0, 0, 22)
+        blockFrame.BackgroundColor3 = isMissing and Color3.fromRGB(60, 20, 30) or Color3.fromRGB(25, 20, 40)
+        blockFrame.BorderSizePixel = 0
+        
+        local bfCorner = Instance.new("UICorner", blockFrame)
+        bfCorner.CornerRadius = UDim.new(0, 4)
+        
+        local blockLbl = Instance.new("TextLabel", blockFrame)
+        blockLbl.Size = UDim2.new(1, -50, 1, 0)
+        blockLbl.Position = UDim2.new(0, 5, 0, 0)
+        blockLbl.BackgroundTransparency = 1
+        blockLbl.Text = (isMissing and "🔴" or "🟢") .. " " .. block.name .. " (x" .. block.count .. ")"
+        blockLbl.TextColor3 = isMissing and Color3.fromRGB(255, 100, 100) or Color3.fromRGB(180, 220, 180)
+        blockLbl.Font = Enum.Font.Gotham
+        blockLbl.TextSize = 10
+        blockLbl.TextXAlignment = Enum.TextXAlignment.Left
+        
+        local countLbl = Instance.new("TextLabel", blockFrame)
+        countLbl.Size = UDim2.new(0, 40, 1, 0)
+        countLbl.Position = UDim2.new(1, -45, 0, 0)
+        countLbl.BackgroundTransparency = 1
+        countLbl.Text = block.count
+        countLbl.TextColor3 = Color3.fromRGB(160, 160, 180)
+        countLbl.Font = Enum.Font.GothamBold
+        countLbl.TextSize = 10
+    end
+    
+    -- Show missing blocks warning
+    if #missingBlocks > 0 then
+        local warnLbl = Instance.new("TextLabel", blockListScroll)
+        warnLbl.Size = UDim2.new(1, 0, 0, 20)
+        warnLbl.BackgroundColor3 = Color3.fromRGB(80, 30, 40)
+        warnLbl.Text = "⚠️ Missing " .. #missingBlocks .. " block(s)! Purchase to load build."
+        warnLbl.TextColor3 = Color3.fromRGB(255, 150, 100)
+        warnLbl.Font = Enum.Font.GothamBold
+        warnLbl.TextSize = 10
+        
+        local warnCorner = Instance.new("UICorner", warnLbl)
+        warnCorner.CornerRadius = UDim.new(0, 4)
+    end
+end
+
+-- Update preview when file selection changes
+task.spawn(function()
+    while true do
+        task.wait(0.3)
+        if buildFileSelected and buildFileSelected.value then
+            updatePreviewAndBlockList()
+            task.wait(2) -- Don't update too frequently
+        end
+    end
+end)
+
+-- Updated Y position for build controls after block list
+local finalBuildControlsY = blockListY + 130
+
+createLabel(p1, "⚙️ Build Speed (studs/sec):", finalBuildControlsY, 16, Color3.fromRGB(160, 120, 220))
 local speedInput, _ = createInput(p1, "e.g. 5", buildControlsY + 18, 34)
 speedInput.Text = "5"
 
-createLabel(p1, "📍 Build Position Offset (X, Y, Z):", buildControlsY + 60, 16, Color3.fromRGB(160, 120, 220))
-local posInput, _ = createInput(p1, "e.g. 0, 5, 0", buildControlsY + 78, 34)
+createLabel(p1, "📍 Build Position Offset (X, Y, Z):", finalBuildControlsY + 60, 16, Color3.fromRGB(160, 120, 220))
+local posInput, _ = createInput(p1, "e.g. 0, 5, 0", finalBuildControlsY + 78, 34)
 posInput.Text = "0, 5, 0"
 
-local buildBtn = createButton(p1, "🔨 START AUTOBUILD", buildControlsY + 120, Color3.fromRGB(80, 40, 180))
-local stopBuildBtn = createButton(p1, "⏹ STOP BUILD", buildControlsY + 166, Color3.fromRGB(160, 40, 80))
+local buildBtn = createButton(p1, "🔨 START AUTOBUILD", finalBuildControlsY + 120, Color3.fromRGB(80, 40, 180))
+local stopBuildBtn = createButton(p1, "⏹ STOP BUILD", finalBuildControlsY + 166, Color3.fromRGB(160, 40, 80))
 
-local buildStatus, _ = createStatusBox(p1, buildControlsY + 212)
+local buildStatus, _ = createStatusBox(p1, finalBuildControlsY + 212)
 
 -- ============================================================
 -- AUTOBUILD LOGIC

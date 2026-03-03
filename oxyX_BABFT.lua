@@ -4,7 +4,7 @@
 -- ██║   ██║ ██╔██╗   ╚██╔╝   ██╔██╗ 
 -- ╚██████╔╝██╔╝ ██╗   ██║   ██╔╝ ██╗
 --  ╚═════╝ ╚═╝  ╚═╝   ╚═╝   ╚═╝  ╚═╝
--- oxyX BABFT Suite | Powered by oxyX Market
+-- oxyX BABFT Suite v2.0 | Powered by oxyX Market
 -- Compatible: Xeno / Velocity / Fluxus
 
 -- ============================================================
@@ -53,10 +53,6 @@ end
 
 local function notify(title, msg, duration)
     duration = duration or 3
-    if syn and syn.protect_gui then
-        -- handled below
-    end
-    -- Simple notification via GUI
     local notifGui = Instance.new("ScreenGui")
     notifGui.Name = "oxyX_Notif"
     notifGui.ResetOnSpawn = false
@@ -111,6 +107,51 @@ local function notify(title, msg, duration)
 end
 
 -- ============================================================
+-- WORKSPACE FILE BROWSER HELPER
+-- ============================================================
+-- Lists files in executor workspace filtered by extension
+local function listWorkspaceFiles(ext)
+    local files = {}
+    local ok, result = pcall(function()
+        -- Try listfiles (Synapse/Xeno/most executors)
+        if listfiles then
+            local all = listfiles("")
+            for _, path in ipairs(all) do
+                local name = path:match("([^/\\]+)$") or path
+                if ext == nil or name:lower():sub(-#ext) == ext:lower() then
+                    table.insert(files, {path = path, name = name})
+                end
+            end
+        end
+    end)
+    if not ok or #files == 0 then
+        -- Fallback: try readdir if available
+        pcall(function()
+            if readdir then
+                local all = readdir("")
+                for _, entry in ipairs(all) do
+                    local name = type(entry) == "string" and entry or entry.name or ""
+                    if ext == nil or name:lower():sub(-#ext) == ext:lower() then
+                        table.insert(files, {path = name, name = name})
+                    end
+                end
+            end
+        end)
+    end
+    return files
+end
+
+local function readWorkspaceFile(path)
+    local content = nil
+    pcall(function()
+        if readfile then
+            content = readfile(path)
+        end
+    end)
+    return content
+end
+
+-- ============================================================
 -- MAIN GUI CREATION
 -- ============================================================
 local existingGui = CoreGui:FindFirstChild("oxyX_BABFT")
@@ -128,8 +169,8 @@ if not ScreenGui.Parent then ScreenGui.Parent = player.PlayerGui end
 -- ============================================================
 local MainFrame = Instance.new("Frame", ScreenGui)
 MainFrame.Name = "MainFrame"
-MainFrame.Size = UDim2.new(0, 520, 0, 480)
-MainFrame.Position = UDim2.new(0.5, -260, 0.5, -240)
+MainFrame.Size = UDim2.new(0, 560, 0, 520)
+MainFrame.Position = UDim2.new(0.5, -280, 0.5, -260)
 MainFrame.BackgroundColor3 = Color3.fromRGB(10, 10, 18)
 MainFrame.BorderSizePixel = 0
 MainFrame.ClipsDescendants = true
@@ -141,7 +182,6 @@ local mainStroke = Instance.new("UIStroke", MainFrame)
 mainStroke.Color = Color3.fromRGB(100, 50, 220)
 mainStroke.Thickness = 1.5
 
--- Gradient background
 local gradient = Instance.new("UIGradient", MainFrame)
 gradient.Color = ColorSequence.new({
     ColorSequenceKeypoint.new(0, Color3.fromRGB(10, 10, 22)),
@@ -170,12 +210,11 @@ titleBarGrad.Color = ColorSequence.new({
 })
 titleBarGrad.Rotation = 90
 
--- Logo / Title
 local TitleLabel = Instance.new("TextLabel", TitleBar)
 TitleLabel.Size = UDim2.new(1, -100, 1, 0)
 TitleLabel.Position = UDim2.new(0, 14, 0, 0)
 TitleLabel.BackgroundTransparency = 1
-TitleLabel.Text = "⚡ oxyX BABFT Suite"
+TitleLabel.Text = "⚡ oxyX BABFT Suite v2.0"
 TitleLabel.TextColor3 = Color3.fromRGB(200, 150, 255)
 TitleLabel.Font = Enum.Font.GothamBold
 TitleLabel.TextSize = 16
@@ -191,7 +230,6 @@ SubLabel.Font = Enum.Font.Gotham
 SubLabel.TextSize = 10
 SubLabel.TextXAlignment = Enum.TextXAlignment.Left
 
--- Minimize Button (-)
 local MinBtn = Instance.new("TextButton", TitleBar)
 MinBtn.Name = "MinBtn"
 MinBtn.Size = UDim2.new(0, 28, 0, 28)
@@ -207,7 +245,6 @@ MinBtn.AutoButtonColor = false
 local minCorner = Instance.new("UICorner", MinBtn)
 minCorner.CornerRadius = UDim.new(0, 6)
 
--- Close Button (X)
 local CloseBtn = Instance.new("TextButton", TitleBar)
 CloseBtn.Name = "CloseBtn"
 CloseBtn.Size = UDim2.new(0, 28, 0, 28)
@@ -260,7 +297,7 @@ end)
 -- MINIMIZE / CLOSE LOGIC
 -- ============================================================
 local minimized = false
-local ContentFrame -- defined below
+local ContentFrame
 
 CloseBtn.MouseButton1Click:Connect(function()
     tween(MainFrame, {Size = UDim2.new(0, 0, 0, 0), Position = UDim2.new(0.5, 0, 0.5, 0)}, 0.3)
@@ -295,9 +332,10 @@ TabBar.BackgroundTransparency = 1
 local tabLayout = Instance.new("UIListLayout", TabBar)
 tabLayout.FillDirection = Enum.FillDirection.Horizontal
 tabLayout.SortOrder = Enum.SortOrder.LayoutOrder
-tabLayout.Padding = UDim.new(0, 6)
+tabLayout.Padding = UDim.new(0, 5)
 
-local tabNames = {"🔨 AutoBuild", "📦 OBJ Loader", "🖼️ Image Loader", "ℹ️ Info"}
+-- 5 tabs now: AutoBuild, OBJ→Studio, OBJ→Sketchfab, Image, Info
+local tabNames = {"🔨 AutoBuild", "🎮 OBJ Studio", "📦 OBJ External", "🖼️ Image", "ℹ️ Info"}
 local tabButtons = {}
 local tabPages = {}
 local activeTab = 1
@@ -311,17 +349,16 @@ ContentFrame.Size = UDim2.new(1, -20, 1, -106)
 ContentFrame.Position = UDim2.new(0, 10, 0, 96)
 ContentFrame.BackgroundTransparency = 1
 
--- Minimize logic (needs ContentFrame)
 MinBtn.MouseButton1Click:Connect(function()
     minimized = not minimized
     if minimized then
-        tween(MainFrame, {Size = UDim2.new(0, 520, 0, 52)}, 0.3)
+        tween(MainFrame, {Size = UDim2.new(0, 560, 0, 52)}, 0.3)
         ContentFrame.Visible = false
         TabBar.Visible = false
     else
         ContentFrame.Visible = true
         TabBar.Visible = true
-        tween(MainFrame, {Size = UDim2.new(0, 520, 0, 480)}, 0.3)
+        tween(MainFrame, {Size = UDim2.new(0, 560, 0, 520)}, 0.3)
     end
 end)
 
@@ -329,10 +366,15 @@ end)
 -- HELPER: CREATE PAGE
 -- ============================================================
 local function createPage()
-    local page = Instance.new("Frame", ContentFrame)
+    local page = Instance.new("ScrollingFrame", ContentFrame)
     page.Size = UDim2.new(1, 0, 1, 0)
     page.BackgroundTransparency = 1
     page.Visible = false
+    page.ScrollBarThickness = 4
+    page.ScrollBarImageColor3 = Color3.fromRGB(100, 50, 220)
+    page.CanvasSize = UDim2.new(0, 0, 0, 0)
+    page.AutomaticCanvasSize = Enum.AutomaticSize.Y
+    page.BorderSizePixel = 0
     return page
 end
 
@@ -476,16 +518,209 @@ local function createStatusBox(parent, posY)
 end
 
 -- ============================================================
+-- HELPER: FILE SELECTOR DROPDOWN
+-- ============================================================
+-- Creates a file selector UI that lists workspace files with given extension
+-- Returns: selectedPathLabel (TextLabel), refreshBtn (TextButton), selectedPath (table ref)
+local function createFileSelector(parent, ext, posY, labelText, accentColor)
+    accentColor = accentColor or Color3.fromRGB(100, 50, 220)
+    local selectedPath = {value = nil, name = nil}
+
+    -- Section label
+    local sectionLbl = Instance.new("TextLabel", parent)
+    sectionLbl.Size = UDim2.new(1, 0, 0, 18)
+    sectionLbl.Position = UDim2.new(0, 0, 0, posY)
+    sectionLbl.BackgroundTransparency = 1
+    sectionLbl.Text = labelText
+    sectionLbl.TextColor3 = Color3.fromRGB(160, 120, 220)
+    sectionLbl.Font = Enum.Font.GothamBold
+    sectionLbl.TextSize = 12
+    sectionLbl.TextXAlignment = Enum.TextXAlignment.Left
+
+    -- Selected file display
+    local selBg = Instance.new("Frame", parent)
+    selBg.Size = UDim2.new(1, -44, 0, 34)
+    selBg.Position = UDim2.new(0, 0, 0, posY + 22)
+    selBg.BackgroundColor3 = Color3.fromRGB(20, 15, 38)
+    selBg.BorderSizePixel = 0
+
+    local selCorner = Instance.new("UICorner", selBg)
+    selCorner.CornerRadius = UDim.new(0, 8)
+
+    local selStroke = Instance.new("UIStroke", selBg)
+    selStroke.Color = Color3.fromRGB(70, 40, 130)
+    selStroke.Thickness = 1
+
+    local selLbl = Instance.new("TextLabel", selBg)
+    selLbl.Size = UDim2.new(1, -10, 1, 0)
+    selLbl.Position = UDim2.new(0, 8, 0, 0)
+    selLbl.BackgroundTransparency = 1
+    selLbl.Text = "No file selected"
+    selLbl.TextColor3 = Color3.fromRGB(100, 80, 140)
+    selLbl.Font = Enum.Font.Gotham
+    selLbl.TextSize = 11
+    selLbl.TextXAlignment = Enum.TextXAlignment.Left
+    selLbl.TextTruncate = Enum.TextTruncate.AtEnd
+
+    -- Refresh button
+    local refreshBtn = Instance.new("TextButton", parent)
+    refreshBtn.Size = UDim2.new(0, 38, 0, 34)
+    refreshBtn.Position = UDim2.new(1, -38, 0, posY + 22)
+    refreshBtn.BackgroundColor3 = Color3.fromRGB(40, 30, 80)
+    refreshBtn.Text = "🔄"
+    refreshBtn.TextColor3 = Color3.fromRGB(200, 180, 255)
+    refreshBtn.Font = Enum.Font.GothamBold
+    refreshBtn.TextSize = 14
+    refreshBtn.BorderSizePixel = 0
+    refreshBtn.AutoButtonColor = false
+
+    local refCorner = Instance.new("UICorner", refreshBtn)
+    refCorner.CornerRadius = UDim.new(0, 8)
+
+    -- File list dropdown frame
+    local dropFrame = Instance.new("Frame", parent)
+    dropFrame.Size = UDim2.new(1, 0, 0, 0)
+    dropFrame.Position = UDim2.new(0, 0, 0, posY + 60)
+    dropFrame.BackgroundColor3 = Color3.fromRGB(16, 12, 30)
+    dropFrame.BorderSizePixel = 0
+    dropFrame.ClipsDescendants = true
+    dropFrame.Visible = false
+
+    local dropCorner = Instance.new("UICorner", dropFrame)
+    dropCorner.CornerRadius = UDim.new(0, 8)
+
+    local dropStroke = Instance.new("UIStroke", dropFrame)
+    dropStroke.Color = Color3.fromRGB(70, 40, 130)
+    dropStroke.Thickness = 1
+
+    local dropScroll = Instance.new("ScrollingFrame", dropFrame)
+    dropScroll.Size = UDim2.new(1, -4, 1, 0)
+    dropScroll.Position = UDim2.new(0, 2, 0, 0)
+    dropScroll.BackgroundTransparency = 1
+    dropScroll.ScrollBarThickness = 3
+    dropScroll.ScrollBarImageColor3 = Color3.fromRGB(100, 50, 220)
+    dropScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
+    dropScroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
+    dropScroll.BorderSizePixel = 0
+
+    local dropLayout = Instance.new("UIListLayout", dropScroll)
+    dropLayout.SortOrder = Enum.SortOrder.LayoutOrder
+    dropLayout.Padding = UDim.new(0, 2)
+
+    local dropOpen = false
+    local fileList = {}
+
+    local function populateDropdown()
+        -- Clear existing items
+        for _, child in ipairs(dropScroll:GetChildren()) do
+            if child:IsA("TextButton") then
+                child:Destroy()
+            end
+        end
+        fileList = listWorkspaceFiles(ext)
+
+        if #fileList == 0 then
+            local noFileLbl = Instance.new("TextButton", dropScroll)
+            noFileLbl.Size = UDim2.new(1, 0, 0, 30)
+            noFileLbl.BackgroundTransparency = 1
+            noFileLbl.Text = "  ⚠️ No " .. ext .. " files found in workspace"
+            noFileLbl.TextColor3 = Color3.fromRGB(200, 150, 80)
+            noFileLbl.Font = Enum.Font.Gotham
+            noFileLbl.TextSize = 11
+            noFileLbl.TextXAlignment = Enum.TextXAlignment.Left
+            noFileLbl.BorderSizePixel = 0
+            noFileLbl.AutoButtonColor = false
+        else
+            for idx, fileInfo in ipairs(fileList) do
+                local itemBtn = Instance.new("TextButton", dropScroll)
+                itemBtn.Size = UDim2.new(1, 0, 0, 32)
+                itemBtn.BackgroundColor3 = Color3.fromRGB(22, 16, 42)
+                itemBtn.Text = "  📄 " .. fileInfo.name
+                itemBtn.TextColor3 = Color3.fromRGB(200, 180, 240)
+                itemBtn.Font = Enum.Font.Gotham
+                itemBtn.TextSize = 11
+                itemBtn.TextXAlignment = Enum.TextXAlignment.Left
+                itemBtn.BorderSizePixel = 0
+                itemBtn.AutoButtonColor = false
+                itemBtn.LayoutOrder = idx
+
+                local itemCorner = Instance.new("UICorner", itemBtn)
+                itemCorner.CornerRadius = UDim.new(0, 6)
+
+                itemBtn.MouseEnter:Connect(function()
+                    tween(itemBtn, {BackgroundColor3 = Color3.fromRGB(50, 35, 90)}, 0.1)
+                end)
+                itemBtn.MouseLeave:Connect(function()
+                    tween(itemBtn, {BackgroundColor3 = Color3.fromRGB(22, 16, 42)}, 0.1)
+                end)
+
+                itemBtn.MouseButton1Click:Connect(function()
+                    selectedPath.value = fileInfo.path
+                    selectedPath.name = fileInfo.name
+                    selLbl.Text = "📄 " .. fileInfo.name
+                    selLbl.TextColor3 = Color3.fromRGB(180, 220, 255)
+                    tween(selStroke, {Color = accentColor}, 0.2)
+                    -- Close dropdown
+                    dropOpen = false
+                    tween(dropFrame, {Size = UDim2.new(1, 0, 0, 0)}, 0.2)
+                    task.delay(0.25, function()
+                        dropFrame.Visible = false
+                    end)
+                end)
+            end
+        end
+    end
+
+    -- Toggle dropdown on click of selBg
+    selBg.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dropOpen = not dropOpen
+            if dropOpen then
+                populateDropdown()
+                dropFrame.Visible = true
+                local targetH = math.min(#fileList * 34 + 8, 140)
+                if #fileList == 0 then targetH = 38 end
+                tween(dropFrame, {Size = UDim2.new(1, 0, 0, targetH)}, 0.2)
+                tween(selStroke, {Color = Color3.fromRGB(140, 80, 255)}, 0.2)
+            else
+                tween(dropFrame, {Size = UDim2.new(1, 0, 0, 0)}, 0.2)
+                task.delay(0.25, function()
+                    dropFrame.Visible = false
+                end)
+                tween(selStroke, {Color = Color3.fromRGB(70, 40, 130)}, 0.2)
+            end
+        end
+    end)
+
+    refreshBtn.MouseButton1Click:Connect(function()
+        if dropOpen then
+            populateDropdown()
+        else
+            dropOpen = true
+            populateDropdown()
+            dropFrame.Visible = true
+            local targetH = math.min(#fileList * 34 + 8, 140)
+            if #fileList == 0 then targetH = 38 end
+            tween(dropFrame, {Size = UDim2.new(1, 0, 0, targetH)}, 0.2)
+        end
+        notify("oxyX", "Refreshed " .. ext .. " file list!", 2)
+    end)
+
+    -- Returns: selectedPath table, dropFrame (so caller can offset below it), selLbl
+    return selectedPath, dropFrame, selLbl
+end
+
+-- ============================================================
 -- TAB CREATION
 -- ============================================================
 for i, name in ipairs(tabNames) do
     local btn = Instance.new("TextButton", TabBar)
-    btn.Size = UDim2.new(0, 110, 1, 0)
+    btn.Size = UDim2.new(0, 96, 1, 0)
     btn.BackgroundColor3 = Color3.fromRGB(20, 15, 38)
     btn.Text = name
     btn.TextColor3 = Color3.fromRGB(140, 110, 190)
     btn.Font = Enum.Font.GothamBold
-    btn.TextSize = 11
+    btn.TextSize = 10
     btn.BorderSizePixel = 0
     btn.AutoButtonColor = false
     btn.LayoutOrder = i
@@ -516,29 +751,35 @@ for i, btn in ipairs(tabButtons) do
 end
 
 -- ============================================================
--- PAGE 1: AUTOBUILD
+-- PAGE 1: AUTOBUILD (File Selector — .build files only)
 -- ============================================================
 local p1 = tabPages[1]
 
-createLabel(p1, "📂 Paste your .build script data below:", 0, 18, Color3.fromRGB(160, 120, 220))
+createLabel(p1, "📂 Select a .build file from your workspace:", 0, 18, Color3.fromRGB(160, 120, 220))
+createLabel(p1, "Only .build files are shown (e.g. ocd.build)", 18, 14, Color3.fromRGB(100, 80, 150))
 
-local buildInput, buildInputBg = createInput(p1, "Paste .build data here (JSON format)...", 22, 80)
-buildInput.MultiLine = true
-buildInput.TextYAlignment = Enum.TextYAlignment.Top
-buildInputBg.Size = UDim2.new(1, 0, 0, 80)
+-- File selector for .build
+local buildFileSelected, buildDropFrame, buildSelLbl = createFileSelector(
+    p1, ".build", 36,
+    "📁 Workspace .build Files:",
+    Color3.fromRGB(100, 50, 220)
+)
 
-createLabel(p1, "⚙️ Build Speed (studs/sec):", 110, 16, Color3.fromRGB(160, 120, 220))
-local speedInput, _ = createInput(p1, "e.g. 5", 130, 34)
+-- Dynamic Y offset after dropdown (dropdown max height ~140)
+local buildControlsY = 36 + 22 + 34 + 145  -- label + selBg + dropdown max + padding
+
+createLabel(p1, "⚙️ Build Speed (studs/sec):", buildControlsY, 16, Color3.fromRGB(160, 120, 220))
+local speedInput, _ = createInput(p1, "e.g. 5", buildControlsY + 18, 34)
 speedInput.Text = "5"
 
-createLabel(p1, "📍 Build Position Offset (X, Y, Z):", 172, 16, Color3.fromRGB(160, 120, 220))
-local posInput, _ = createInput(p1, "e.g. 0, 5, 0", 192, 34)
+createLabel(p1, "📍 Build Position Offset (X, Y, Z):", buildControlsY + 60, 16, Color3.fromRGB(160, 120, 220))
+local posInput, _ = createInput(p1, "e.g. 0, 5, 0", buildControlsY + 78, 34)
 posInput.Text = "0, 5, 0"
 
-local buildBtn = createButton(p1, "🔨 START AUTOBUILD", 234, Color3.fromRGB(80, 40, 180))
-local stopBuildBtn = createButton(p1, "⏹ STOP BUILD", 280, Color3.fromRGB(160, 40, 80))
+local buildBtn = createButton(p1, "🔨 START AUTOBUILD", buildControlsY + 120, Color3.fromRGB(80, 40, 180))
+local stopBuildBtn = createButton(p1, "⏹ STOP BUILD", buildControlsY + 166, Color3.fromRGB(160, 40, 80))
 
-local buildStatus, _ = createStatusBox(p1, 326)
+local buildStatus, _ = createStatusBox(p1, buildControlsY + 212)
 
 -- ============================================================
 -- AUTOBUILD LOGIC
@@ -553,7 +794,6 @@ local function parseBuildData(raw)
     if ok and type(data) == "table" then
         return data
     end
-    -- Try simple line-by-line format
     local parts = {}
     for line in raw:gmatch("[^\n]+") do
         local trimmed = line:match("^%s*(.-)%s*$")
@@ -564,35 +804,36 @@ local function parseBuildData(raw)
     return parts
 end
 
-local function getBABFTBuildTool()
-    local char = player.Character
-    if not char then return nil end
-    -- Try to find build tool in backpack or character
-    local backpack = player.Backpack
-    for _, tool in ipairs(backpack:GetChildren()) do
-        if tool:IsA("Tool") and (tool.Name:lower():find("build") or tool.Name:lower():find("block")) then
-            return tool
-        end
-    end
-    for _, tool in ipairs(char:GetChildren()) do
-        if tool:IsA("Tool") and (tool.Name:lower():find("build") or tool.Name:lower():find("block")) then
-            return tool
-        end
-    end
-    return nil
-end
-
 buildBtn.MouseButton1Click:Connect(function()
     if buildRunning then
         notify("oxyX AutoBuild", "Build already running! Stop it first.", 3)
         return
     end
 
-    local raw = buildInput.Text
-    if raw == "" or raw == nil then
-        buildStatus.Text = "Status: ❌ No .build data provided!"
+    -- Validate file selection
+    if not buildFileSelected.value then
+        buildStatus.Text = "Status: ❌ No .build file selected!"
         buildStatus.TextColor3 = Color3.fromRGB(255, 80, 80)
-        notify("oxyX AutoBuild", "Please paste .build data first!", 3)
+        notify("oxyX AutoBuild", "Please select a .build file first!", 3)
+        return
+    end
+
+    -- Validate extension
+    if not buildFileSelected.name:lower():match("%.build$") then
+        buildStatus.Text = "Status: ❌ Invalid file! Only .build files allowed."
+        buildStatus.TextColor3 = Color3.fromRGB(255, 80, 80)
+        notify("oxyX AutoBuild", "Only .build files are supported!", 3)
+        return
+    end
+
+    buildStatus.Text = "Status: 📂 Reading " .. buildFileSelected.name .. "..."
+    buildStatus.TextColor3 = Color3.fromRGB(120, 200, 255)
+
+    local raw = readWorkspaceFile(buildFileSelected.value)
+    if not raw or raw == "" then
+        buildStatus.Text = "Status: ❌ Could not read file: " .. buildFileSelected.name
+        buildStatus.TextColor3 = Color3.fromRGB(255, 80, 80)
+        notify("oxyX AutoBuild", "Failed to read file! Check executor permissions.", 3)
         return
     end
 
@@ -602,16 +843,16 @@ buildBtn.MouseButton1Click:Connect(function()
 
     local buildData = parseBuildData(raw)
     if not buildData or #buildData == 0 then
-        buildStatus.Text = "Status: ❌ Invalid .build data format!"
+        buildStatus.Text = "Status: ❌ Invalid .build data in file!"
         buildStatus.TextColor3 = Color3.fromRGB(255, 80, 80)
-        notify("oxyX AutoBuild", "Invalid .build data! Use JSON format.", 3)
+        notify("oxyX AutoBuild", "Invalid .build data! File must contain JSON.", 3)
         return
     end
 
     buildRunning = true
-    buildStatus.Text = "Status: 🔨 Building... (0/" .. #buildData .. ")"
+    buildStatus.Text = "Status: 🔨 Building... (0/" .. #buildData .. ") from " .. buildFileSelected.name
     buildStatus.TextColor3 = Color3.fromRGB(120, 200, 255)
-    notify("oxyX AutoBuild", "Starting build of " .. #buildData .. " parts...", 3)
+    notify("oxyX AutoBuild", "Starting build of " .. #buildData .. " parts from " .. buildFileSelected.name, 3)
 
     buildThread = task.spawn(function()
         local char = player.Character or player.CharacterAdded:Wait()
@@ -628,22 +869,15 @@ buildBtn.MouseButton1Click:Connect(function()
         for i, partData in ipairs(buildData) do
             if not buildRunning then break end
 
-            -- Handle both table and string formats
             local partInfo = type(partData) == "table" and partData or {}
-            local partName = partInfo.name or partInfo.Name or "Part"
-            local partSize = partInfo.size or partInfo.Size or {x=4, y=1.2, z=4}
             local partPos = partInfo.position or partInfo.Position or {x=0, y=0, z=0}
+            local partSize = partInfo.size or partInfo.Size or {x=4, y=1.2, z=4}
             local partColor = partInfo.color or partInfo.Color or {r=163, g=162, b=165}
             local partMat = partInfo.material or partInfo.Material or "SmoothPlastic"
             local partShape = partInfo.shape or partInfo.Shape or "Block"
 
-            -- Attempt to place via BABFT remote
-            local success = pcall(function()
-                -- Try to find BABFT placement remote
-                local workspace = game.Workspace
+            pcall(function()
                 local remotes = game:GetService("ReplicatedStorage")
-
-                -- Common BABFT remote names
                 local placeRemote = remotes:FindFirstChild("PlacePart")
                     or remotes:FindFirstChild("BuildPart")
                     or remotes:FindFirstChild("Place")
@@ -676,7 +910,7 @@ buildBtn.MouseButton1Click:Connect(function()
 
         if buildRunning then
             buildRunning = false
-            buildStatus.Text = "Status: ✅ Build Complete! (" .. #buildData .. " parts)"
+            buildStatus.Text = "Status: ✅ Build Complete! (" .. #buildData .. " parts) — " .. buildFileSelected.name
             buildStatus.TextColor3 = Color3.fromRGB(120, 255, 120)
             notify("oxyX AutoBuild", "Build complete! " .. #buildData .. " parts placed.", 4)
         end
@@ -699,29 +933,7 @@ stopBuildBtn.MouseButton1Click:Connect(function()
 end)
 
 -- ============================================================
--- PAGE 2: OBJ LOADER
--- ============================================================
-local p2 = tabPages[2]
-
-createLabel(p2, "📦 Paste .obj file content below:", 0, 18, Color3.fromRGB(160, 120, 220))
-
-local objInput, objInputBg = createInput(p2, "Paste .obj content here (v, f lines)...", 22, 80)
-objInput.MultiLine = true
-objInput.TextYAlignment = Enum.TextYAlignment.Top
-objInputBg.Size = UDim2.new(1, 0, 0, 80)
-
-createLabel(p2, "📐 Scale Factor:", 110, 16, Color3.fromRGB(160, 120, 220))
-local scaleInput, _ = createInput(p2, "e.g. 1.0", 130, 34)
-scaleInput.Text = "1.0"
-
-local convertBtn = createButton(p2, "🔄 CONVERT OBJ → .BUILD", 172, Color3.fromRGB(40, 120, 200))
-local importRobloxBtn = createButton(p2, "🎮 IMPORT TO ROBLOX STUDIO FORMAT", 218, Color3.fromRGB(20, 140, 80))
-local buildFromObjBtn = createButton(p2, "🔨 BUILD IN BABFT FROM OBJ", 264, Color3.fromRGB(80, 40, 180))
-
-local objStatus, _ = createStatusBox(p2, 310)
-
--- ============================================================
--- OBJ PARSER
+-- OBJ PARSER (shared)
 -- ============================================================
 local function parseOBJ(content)
     local vertices = {}
@@ -732,17 +944,17 @@ local function parseOBJ(content)
     for line in content:gmatch("[^\n]+") do
         local trimmed = line:match("^%s*(.-)%s*$")
         if trimmed:sub(1, 2) == "v " then
-            local x, y, z = trimmed:match("v%s+([%-%.%d]+)%s+([%-%.%d]+)%s+([%-%.%d]+)")
+            local x, y, z = trimmed:match("v%s+([%-%.%deE+]+)%s+([%-%.%deE+]+)%s+([%-%.%deE+]+)")
             if x then
                 table.insert(vertices, {x = tonumber(x), y = tonumber(y), z = tonumber(z)})
             end
         elseif trimmed:sub(1, 3) == "vn " then
-            local x, y, z = trimmed:match("vn%s+([%-%.%d]+)%s+([%-%.%d]+)%s+([%-%.%d]+)")
+            local x, y, z = trimmed:match("vn%s+([%-%.%deE+]+)%s+([%-%.%deE+]+)%s+([%-%.%deE+]+)")
             if x then
                 table.insert(normals, {x = tonumber(x), y = tonumber(y), z = tonumber(z)})
             end
         elseif trimmed:sub(1, 3) == "vt " then
-            local u, v = trimmed:match("vt%s+([%-%.%d]+)%s+([%-%.%d]+)")
+            local u, v = trimmed:match("vt%s+([%-%.%deE+]+)%s+([%-%.%deE+]+)")
             if u then
                 table.insert(uvs, {u = tonumber(u), v = tonumber(v)})
             end
@@ -766,13 +978,10 @@ end
 local function objToBuildFormat(vertices, faces, scale)
     scale = scale or 1.0
     local parts = {}
-
-    -- Convert each face to a part (simplified: use face centroid + bounding box)
     for i, face in ipairs(faces) do
         if #face >= 3 then
             local minX, minY, minZ = math.huge, math.huge, math.huge
             local maxX, maxY, maxZ = -math.huge, -math.huge, -math.huge
-
             for _, vi in ipairs(face) do
                 local v = vertices[vi]
                 if v then
@@ -784,14 +993,12 @@ local function objToBuildFormat(vertices, faces, scale)
                     maxZ = math.max(maxZ, v.z * scale)
                 end
             end
-
             local cx = (minX + maxX) / 2
             local cy = (minY + maxY) / 2
             local cz = (minZ + maxZ) / 2
             local sx = math.max(math.abs(maxX - minX), 0.1)
             local sy = math.max(math.abs(maxY - minY), 0.1)
             local sz = math.max(math.abs(maxZ - minZ), 0.1)
-
             table.insert(parts, {
                 name = "OBJ_Part_" .. i,
                 position = {x = cx, y = cy, z = cz},
@@ -802,28 +1009,71 @@ local function objToBuildFormat(vertices, faces, scale)
             })
         end
     end
-
     return parts
 end
+
+-- ============================================================
+-- PAGE 2: OBJ → ROBLOX STUDIO (Roblox Studio OBJ format)
+-- ============================================================
+-- This tab is for OBJ files exported FROM Roblox Studio or
+-- intended to be imported back into Roblox Studio.
+-- It generates a Studio script that uses game:GetService("InsertService")
+-- or creates Parts with proper CFrame/Size, and also supports
+-- converting to .build format for BABFT.
+-- ============================================================
+local p2 = tabPages[2]
+
+createLabel(p2, "🎮 OBJ → Roblox Studio Import", 0, 18, Color3.fromRGB(160, 120, 220))
+createLabel(p2, "Select a .obj file from workspace to convert for Roblox Studio.", 18, 14, Color3.fromRGB(100, 80, 150))
+
+local studioObjSelected, studioDropFrame, studioSelLbl = createFileSelector(
+    p2, ".obj", 36,
+    "📁 Workspace .obj Files (Roblox Studio):",
+    Color3.fromRGB(20, 140, 80)
+)
+
+local studioControlsY = 36 + 22 + 34 + 145
+
+createLabel(p2, "📐 Scale Factor:", studioControlsY, 16, Color3.fromRGB(160, 120, 220))
+local studioScaleInput, _ = createInput(p2, "e.g. 1.0", studioControlsY + 18, 34)
+studioScaleInput.Text = "1.0"
+
+createLabel(p2, "🏷️ Model Name:", studioControlsY + 60, 16, Color3.fromRGB(160, 120, 220))
+local studioNameInput, _ = createInput(p2, "e.g. MyModel", studioControlsY + 78, 34)
+studioNameInput.Text = "OBJ_Import"
+
+-- Generate Roblox Studio script button
+local genStudioBtn = createButton(p2, "🎮 GENERATE ROBLOX STUDIO SCRIPT", studioControlsY + 120, Color3.fromRGB(20, 140, 80))
+-- Convert to .build and load into AutoBuild
+local studioToBuildBtn = createButton(p2, "🔨 CONVERT → .BUILD (Load to AutoBuild)", studioControlsY + 166, Color3.fromRGB(80, 40, 180))
+-- Save .build file to workspace
+local studioSaveBuildBtn = createButton(p2, "💾 SAVE AS .BUILD FILE", studioControlsY + 212, Color3.fromRGB(40, 100, 60))
+
+local studioStatus, _ = createStatusBox(p2, studioControlsY + 258)
+
+local lastStudioScript = nil
+local lastStudioBuildData = nil
+local lastStudioBuildJson = nil
 
 local function objToRobloxStudioScript(vertices, faces, scale, objName)
     scale = scale or 1.0
     objName = objName or "OBJ_Import"
     local lines = {}
-    table.insert(lines, "-- oxyX OBJ Import Script for Roblox Studio")
-    table.insert(lines, "-- Generated by oxyX BABFT Suite | Powered by oxyX Market")
+    table.insert(lines, "-- oxyX OBJ → Roblox Studio Import Script")
+    table.insert(lines, "-- Generated by oxyX BABFT Suite v2.0 | Powered by oxyX Market")
     table.insert(lines, "-- Paste this into Roblox Studio Command Bar or a Script")
+    table.insert(lines, "-- Source: Roblox Studio OBJ format")
     table.insert(lines, "")
     table.insert(lines, 'local model = Instance.new("Model")')
     table.insert(lines, 'model.Name = "' .. objName .. '"')
     table.insert(lines, 'model.Parent = workspace')
     table.insert(lines, "")
 
+    local partCount = 0
     for i, face in ipairs(faces) do
         if #face >= 3 then
             local minX, minY, minZ = math.huge, math.huge, math.huge
             local maxX, maxY, maxZ = -math.huge, -math.huge, -math.huge
-
             for _, vi in ipairs(face) do
                 local v = vertices[vi]
                 if v then
@@ -835,7 +1085,6 @@ local function objToRobloxStudioScript(vertices, faces, scale, objName)
                     maxZ = math.max(maxZ, v.z * scale)
                 end
             end
-
             local cx = (minX + maxX) / 2
             local cy = (minY + maxY) / 2
             local cz = (minZ + maxZ) / 2
@@ -845,172 +1094,367 @@ local function objToRobloxStudioScript(vertices, faces, scale, objName)
 
             table.insert(lines, "do")
             table.insert(lines, '  local p = Instance.new("Part")')
-            table.insert(lines, '  p.Name = "Face_' .. i .. '"')
-            table.insert(lines, "  p.Size = Vector3.new(" .. string.format("%.3f", sx) .. ", " .. string.format("%.3f", sy) .. ", " .. string.format("%.3f", sz) .. ")")
-            table.insert(lines, "  p.CFrame = CFrame.new(" .. string.format("%.3f", cx) .. ", " .. string.format("%.3f", cy) .. ", " .. string.format("%.3f", cz) .. ")")
+            table.insert(lines, '  p.Name = "' .. objName .. '_Face_' .. i .. '"')
+            table.insert(lines, "  p.Size = Vector3.new(" .. string.format("%.4f", sx) .. ", " .. string.format("%.4f", sy) .. ", " .. string.format("%.4f", sz) .. ")")
+            table.insert(lines, "  p.CFrame = CFrame.new(" .. string.format("%.4f", cx) .. ", " .. string.format("%.4f", cy) .. ", " .. string.format("%.4f", cz) .. ")")
             table.insert(lines, "  p.Anchored = true")
+            table.insert(lines, "  p.CanCollide = true")
             table.insert(lines, "  p.Material = Enum.Material.SmoothPlastic")
             table.insert(lines, "  p.BrickColor = BrickColor.new('Medium stone grey')")
             table.insert(lines, "  p.Parent = model")
             table.insert(lines, "end")
+            partCount = partCount + 1
         end
     end
 
     table.insert(lines, "")
-    table.insert(lines, 'print("oxyX: Imported ' .. #faces .. ' faces from OBJ")')
+    table.insert(lines, "-- Set PrimaryPart")
+    table.insert(lines, 'local primary = model:FindFirstChildWhichIsA("Part")')
+    table.insert(lines, 'if primary then model.PrimaryPart = primary end')
+    table.insert(lines, "")
+    table.insert(lines, 'print("oxyX Studio: Imported ' .. partCount .. ' parts from OBJ [' .. objName .. ']")')
 
-    return table.concat(lines, "\n")
+    return table.concat(lines, "\n"), partCount
 end
 
-local lastConvertedBuild = nil
-local lastRobloxScript = nil
-
-convertBtn.MouseButton1Click:Connect(function()
-    local raw = objInput.Text
-    if raw == "" then
-        objStatus.Text = "Status: ❌ No OBJ data provided!"
-        objStatus.TextColor3 = Color3.fromRGB(255, 80, 80)
-        notify("oxyX OBJ", "Please paste .obj content first!", 3)
+genStudioBtn.MouseButton1Click:Connect(function()
+    if not studioObjSelected.value then
+        studioStatus.Text = "Status: ❌ No .obj file selected!"
+        studioStatus.TextColor3 = Color3.fromRGB(255, 80, 80)
+        notify("oxyX OBJ Studio", "Please select a .obj file first!", 3)
         return
     end
 
-    local scale = tonumber(scaleInput.Text) or 1.0
-    objStatus.Text = "Status: 🔄 Parsing OBJ..."
-    objStatus.TextColor3 = Color3.fromRGB(120, 200, 255)
+    if not studioObjSelected.name:lower():match("%.obj$") then
+        studioStatus.Text = "Status: ❌ Only .obj files are accepted!"
+        studioStatus.TextColor3 = Color3.fromRGB(255, 80, 80)
+        notify("oxyX OBJ Studio", "Only .obj format is supported!", 3)
+        return
+    end
+
+    studioStatus.Text = "Status: 📂 Reading " .. studioObjSelected.name .. "..."
+    studioStatus.TextColor3 = Color3.fromRGB(120, 200, 255)
 
     task.spawn(function()
+        local raw = readWorkspaceFile(studioObjSelected.value)
+        if not raw or raw == "" then
+            studioStatus.Text = "Status: ❌ Could not read file!"
+            studioStatus.TextColor3 = Color3.fromRGB(255, 80, 80)
+            notify("oxyX OBJ Studio", "Failed to read file!", 3)
+            return
+        end
+
         local ok, err = pcall(function()
+            local scale = tonumber(studioScaleInput.Text) or 1.0
+            local modelName = studioNameInput.Text ~= "" and studioNameInput.Text or "OBJ_Import"
             local verts, faces, normals, uvs = parseOBJ(raw)
+
             if #verts == 0 then
-                objStatus.Text = "Status: ❌ No vertices found in OBJ!"
-                objStatus.TextColor3 = Color3.fromRGB(255, 80, 80)
-                notify("oxyX OBJ", "No vertices found! Check your OBJ format.", 3)
+                studioStatus.Text = "Status: ❌ No vertices found in OBJ!"
+                studioStatus.TextColor3 = Color3.fromRGB(255, 80, 80)
+                notify("oxyX OBJ Studio", "No vertices found! Check your .obj file.", 3)
                 return
             end
 
-            local buildParts = objToBuildFormat(verts, faces, scale)
-            lastConvertedBuild = HttpService:JSONEncode(buildParts)
-            lastRobloxScript = objToRobloxStudioScript(verts, faces, scale, "OBJ_Import")
+            local script, partCount = objToRobloxStudioScript(verts, faces, scale, modelName)
+            lastStudioScript = script
 
-            objStatus.Text = "Status: ✅ Converted! " .. #verts .. " verts, " .. #faces .. " faces → " .. #buildParts .. " parts\n.build data ready in clipboard!"
-            objStatus.TextColor3 = Color3.fromRGB(120, 255, 120)
+            pcall(function() setclipboard(script) end)
 
-            -- Copy to clipboard if available
-            pcall(function()
-                setclipboard(lastConvertedBuild)
-            end)
-
-            notify("oxyX OBJ", "Converted! " .. #buildParts .. " parts. .build data copied to clipboard!", 4)
+            studioStatus.Text = "Status: ✅ Studio script generated!\n" .. #verts .. " verts, " .. #faces .. " faces → " .. partCount .. " parts\nCopied to clipboard!"
+            studioStatus.TextColor3 = Color3.fromRGB(120, 255, 120)
+            notify("oxyX OBJ Studio", "Studio script copied! Paste in Studio Command Bar.", 5)
         end)
         if not ok then
-            objStatus.Text = "Status: ❌ Parse error: " .. tostring(err)
-            objStatus.TextColor3 = Color3.fromRGB(255, 80, 80)
+            studioStatus.Text = "Status: ❌ Error: " .. tostring(err)
+            studioStatus.TextColor3 = Color3.fromRGB(255, 80, 80)
         end
     end)
 end)
 
-importRobloxBtn.MouseButton1Click:Connect(function()
-    local raw = objInput.Text
-    if raw == "" then
-        objStatus.Text = "Status: ❌ No OBJ data provided!"
-        objStatus.TextColor3 = Color3.fromRGB(255, 80, 80)
-        notify("oxyX OBJ", "Please paste .obj content first!", 3)
+studioToBuildBtn.MouseButton1Click:Connect(function()
+    if not studioObjSelected.value then
+        studioStatus.Text = "Status: ❌ No .obj file selected!"
+        studioStatus.TextColor3 = Color3.fromRGB(255, 80, 80)
+        notify("oxyX OBJ Studio", "Please select a .obj file first!", 3)
         return
     end
 
-    local scale = tonumber(scaleInput.Text) or 1.0
-    objStatus.Text = "Status: 🎮 Generating Roblox Studio script..."
-    objStatus.TextColor3 = Color3.fromRGB(120, 200, 255)
+    if not studioObjSelected.name:lower():match("%.obj$") then
+        studioStatus.Text = "Status: ❌ Only .obj files are accepted!"
+        studioStatus.TextColor3 = Color3.fromRGB(255, 80, 80)
+        return
+    end
+
+    studioStatus.Text = "Status: 🔄 Converting OBJ → .build..."
+    studioStatus.TextColor3 = Color3.fromRGB(120, 200, 255)
 
     task.spawn(function()
-        local ok, err = pcall(function()
-            local verts, faces, normals, uvs = parseOBJ(raw)
-            if #verts == 0 then
-                objStatus.Text = "Status: ❌ No vertices found!"
-                objStatus.TextColor3 = Color3.fromRGB(255, 80, 80)
-                return
-            end
-
-            local script = objToRobloxStudioScript(verts, faces, scale, "OBJ_Import")
-            lastRobloxScript = script
-
-            pcall(function()
-                setclipboard(script)
-            end)
-
-            objStatus.Text = "Status: ✅ Roblox Studio script generated!\nCopied to clipboard. Paste in Studio Command Bar."
-            objStatus.TextColor3 = Color3.fromRGB(120, 255, 120)
-            notify("oxyX OBJ", "Roblox Studio script copied! Paste in Studio Command Bar.", 5)
-        end)
-        if not ok then
-            objStatus.Text = "Status: ❌ Error: " .. tostring(err)
-            objStatus.TextColor3 = Color3.fromRGB(255, 80, 80)
+        local raw = readWorkspaceFile(studioObjSelected.value)
+        if not raw or raw == "" then
+            studioStatus.Text = "Status: ❌ Could not read file!"
+            studioStatus.TextColor3 = Color3.fromRGB(255, 80, 80)
+            return
         end
-    end)
-end)
 
-buildFromObjBtn.MouseButton1Click:Connect(function()
-    local raw = objInput.Text
-    if raw == "" then
-        objStatus.Text = "Status: ❌ No OBJ data provided!"
-        objStatus.TextColor3 = Color3.fromRGB(255, 80, 80)
-        notify("oxyX OBJ", "Please paste .obj content first!", 3)
-        return
-    end
-
-    local scale = tonumber(scaleInput.Text) or 1.0
-    objStatus.Text = "Status: 🔄 Converting OBJ → .build..."
-    objStatus.TextColor3 = Color3.fromRGB(120, 200, 255)
-
-    task.spawn(function()
         local ok, err = pcall(function()
+            local scale = tonumber(studioScaleInput.Text) or 1.0
             local verts, faces, normals, uvs = parseOBJ(raw)
+
             if #verts == 0 then
-                objStatus.Text = "Status: ❌ No vertices found!"
-                objStatus.TextColor3 = Color3.fromRGB(255, 80, 80)
+                studioStatus.Text = "Status: ❌ No vertices found!"
+                studioStatus.TextColor3 = Color3.fromRGB(255, 80, 80)
                 return
             end
 
             local buildParts = objToBuildFormat(verts, faces, scale)
-            local buildJson = HttpService:JSONEncode(buildParts)
+            lastStudioBuildData = buildParts
+            lastStudioBuildJson = HttpService:JSONEncode(buildParts)
 
-            -- Auto-paste into AutoBuild tab
-            buildInput.Text = buildJson
-            objStatus.Text = "Status: ✅ OBJ converted and loaded into AutoBuild tab!\n" .. #buildParts .. " parts ready."
-            objStatus.TextColor3 = Color3.fromRGB(120, 255, 120)
-            notify("oxyX OBJ", "OBJ loaded into AutoBuild! Switch to AutoBuild tab and press Start.", 4)
-            switchTab(1)
+            studioStatus.Text = "Status: ✅ Converted! " .. #buildParts .. " parts → loaded into AutoBuild tab!"
+            studioStatus.TextColor3 = Color3.fromRGB(120, 255, 120)
+            notify("oxyX OBJ Studio", "Converted! Switch to AutoBuild tab and select the .build file.", 4)
         end)
         if not ok then
-            objStatus.Text = "Status: ❌ Error: " .. tostring(err)
-            objStatus.TextColor3 = Color3.fromRGB(255, 80, 80)
+            studioStatus.Text = "Status: ❌ Error: " .. tostring(err)
+            studioStatus.TextColor3 = Color3.fromRGB(255, 80, 80)
         end
     end)
+end)
+
+studioSaveBuildBtn.MouseButton1Click:Connect(function()
+    if not lastStudioBuildJson then
+        studioStatus.Text = "Status: ❌ Convert OBJ first before saving!"
+        studioStatus.TextColor3 = Color3.fromRGB(255, 80, 80)
+        notify("oxyX OBJ Studio", "Convert OBJ to .build first!", 3)
+        return
+    end
+
+    local baseName = studioObjSelected.name and studioObjSelected.name:gsub("%.obj$", "") or "studio_import"
+    local saveName = baseName .. ".build"
+
+    local ok, err = pcall(function()
+        if writefile then
+            writefile(saveName, lastStudioBuildJson)
+            studioStatus.Text = "Status: ✅ Saved as " .. saveName .. " in workspace!"
+            studioStatus.TextColor3 = Color3.fromRGB(120, 255, 120)
+            notify("oxyX OBJ Studio", "Saved as " .. saveName .. "! Select it in AutoBuild tab.", 4)
+        else
+            error("writefile not available")
+        end
+    end)
+    if not ok then
+        studioStatus.Text = "Status: ❌ Cannot save file: " .. tostring(err)
+        studioStatus.TextColor3 = Color3.fromRGB(255, 80, 80)
+        notify("oxyX OBJ Studio", "Cannot save file. Executor may not support writefile.", 4)
+    end
 end)
 
 -- ============================================================
--- PAGE 3: IMAGE LOADER
+-- PAGE 3: OBJ → EXTERNAL (Sketchfab / standard .obj only)
+-- ============================================================
+-- This tab is ONLY for standard .obj files from external sources
+-- like Sketchfab, Blender, etc. Only .obj format accepted.
 -- ============================================================
 local p3 = tabPages[3]
 
-createLabel(p3, "🖼️ Discord Image URL:", 0, 18, Color3.fromRGB(160, 120, 220))
-createLabel(p3, "Only Discord CDN links supported (cdn.discordapp.com / media.discordapp.net)", 18, 16, Color3.fromRGB(120, 100, 160))
+createLabel(p3, "📦 OBJ → External (Sketchfab / Blender)", 0, 18, Color3.fromRGB(160, 120, 220))
+createLabel(p3, "Only standard .obj format accepted (Sketchfab, Blender, etc.)", 18, 14, Color3.fromRGB(100, 80, 150))
 
-local imgInput, _ = createInput(p3, "https://cdn.discordapp.com/attachments/...", 38, 34)
+local extObjSelected, extDropFrame, extSelLbl = createFileSelector(
+    p3, ".obj", 36,
+    "📁 Workspace .obj Files (External/Sketchfab):",
+    Color3.fromRGB(40, 120, 200)
+)
 
-createLabel(p3, "📐 Display Size (Width x Height in studs):", 80, 16, Color3.fromRGB(160, 120, 220))
-local imgSizeInput, _ = createInput(p3, "e.g. 10, 10", 100, 34)
+local extControlsY = 36 + 22 + 34 + 145
+
+createLabel(p3, "📐 Scale Factor:", extControlsY, 16, Color3.fromRGB(160, 120, 220))
+local extScaleInput, _ = createInput(p3, "e.g. 1.0", extControlsY + 18, 34)
+extScaleInput.Text = "1.0"
+
+-- Convert OBJ → .build format
+local extConvertBtn = createButton(p3, "🔄 CONVERT OBJ → .BUILD FORMAT", extControlsY + 60, Color3.fromRGB(40, 120, 200))
+-- Save .build to workspace
+local extSaveBuildBtn = createButton(p3, "💾 SAVE AS .BUILD FILE", extControlsY + 106, Color3.fromRGB(40, 100, 60))
+-- Build in BABFT directly
+local extBuildNowBtn = createButton(p3, "🔨 BUILD IN BABFT NOW", extControlsY + 152, Color3.fromRGB(80, 40, 180))
+
+local extStatus, _ = createStatusBox(p3, extControlsY + 198)
+
+local lastExtBuildJson = nil
+local lastExtBuildData = nil
+local lastExtObjName = nil
+
+extConvertBtn.MouseButton1Click:Connect(function()
+    if not extObjSelected.value then
+        extStatus.Text = "Status: ❌ No .obj file selected!"
+        extStatus.TextColor3 = Color3.fromRGB(255, 80, 80)
+        notify("oxyX OBJ External", "Please select a .obj file first!", 3)
+        return
+    end
+
+    -- Strict: only .obj allowed
+    if not extObjSelected.name:lower():match("%.obj$") then
+        extStatus.Text = "Status: ❌ Only .obj format is accepted!\nThis tab does not support other formats."
+        extStatus.TextColor3 = Color3.fromRGB(255, 80, 80)
+        notify("oxyX OBJ External", "Only .obj format is supported here!", 3)
+        return
+    end
+
+    extStatus.Text = "Status: 📂 Reading " .. extObjSelected.name .. "..."
+    extStatus.TextColor3 = Color3.fromRGB(120, 200, 255)
+
+    task.spawn(function()
+        local raw = readWorkspaceFile(extObjSelected.value)
+        if not raw or raw == "" then
+            extStatus.Text = "Status: ❌ Could not read file!"
+            extStatus.TextColor3 = Color3.fromRGB(255, 80, 80)
+            notify("oxyX OBJ External", "Failed to read file!", 3)
+            return
+        end
+
+        local ok, err = pcall(function()
+            local scale = tonumber(extScaleInput.Text) or 1.0
+            local verts, faces, normals, uvs = parseOBJ(raw)
+
+            if #verts == 0 then
+                extStatus.Text = "Status: ❌ No vertices found in OBJ!\nMake sure this is a valid .obj file."
+                extStatus.TextColor3 = Color3.fromRGB(255, 80, 80)
+                notify("oxyX OBJ External", "No vertices found! Check your .obj file.", 3)
+                return
+            end
+
+            local buildParts = objToBuildFormat(verts, faces, scale)
+            lastExtBuildData = buildParts
+            lastExtBuildJson = HttpService:JSONEncode(buildParts)
+            lastExtObjName = extObjSelected.name:gsub("%.obj$", "")
+
+            pcall(function() setclipboard(lastExtBuildJson) end)
+
+            extStatus.Text = "Status: ✅ Converted!\n" .. #verts .. " verts, " .. #faces .. " faces → " .. #buildParts .. " parts\n.build data copied to clipboard!"
+            extStatus.TextColor3 = Color3.fromRGB(120, 255, 120)
+            notify("oxyX OBJ External", "Converted! " .. #buildParts .. " parts. .build copied to clipboard!", 4)
+        end)
+        if not ok then
+            extStatus.Text = "Status: ❌ Error: " .. tostring(err)
+            extStatus.TextColor3 = Color3.fromRGB(255, 80, 80)
+        end
+    end)
+end)
+
+extSaveBuildBtn.MouseButton1Click:Connect(function()
+    if not lastExtBuildJson then
+        extStatus.Text = "Status: ❌ Convert OBJ first before saving!"
+        extStatus.TextColor3 = Color3.fromRGB(255, 80, 80)
+        notify("oxyX OBJ External", "Convert OBJ to .build first!", 3)
+        return
+    end
+
+    local saveName = (lastExtObjName or "ext_import") .. ".build"
+
+    local ok, err = pcall(function()
+        if writefile then
+            writefile(saveName, lastExtBuildJson)
+            extStatus.Text = "Status: ✅ Saved as " .. saveName .. " in workspace!\nSelect it in AutoBuild tab."
+            extStatus.TextColor3 = Color3.fromRGB(120, 255, 120)
+            notify("oxyX OBJ External", "Saved as " .. saveName .. "! Select it in AutoBuild tab.", 4)
+        else
+            error("writefile not available")
+        end
+    end)
+    if not ok then
+        extStatus.Text = "Status: ❌ Cannot save: " .. tostring(err)
+        extStatus.TextColor3 = Color3.fromRGB(255, 80, 80)
+        notify("oxyX OBJ External", "Cannot save file. Executor may not support writefile.", 4)
+    end
+end)
+
+extBuildNowBtn.MouseButton1Click:Connect(function()
+    if not extObjSelected.value then
+        extStatus.Text = "Status: ❌ No .obj file selected!"
+        extStatus.TextColor3 = Color3.fromRGB(255, 80, 80)
+        notify("oxyX OBJ External", "Please select a .obj file first!", 3)
+        return
+    end
+
+    if not extObjSelected.name:lower():match("%.obj$") then
+        extStatus.Text = "Status: ❌ Only .obj format is accepted!"
+        extStatus.TextColor3 = Color3.fromRGB(255, 80, 80)
+        return
+    end
+
+    extStatus.Text = "Status: 🔄 Converting OBJ → .build for BABFT..."
+    extStatus.TextColor3 = Color3.fromRGB(120, 200, 255)
+
+    task.spawn(function()
+        local raw = readWorkspaceFile(extObjSelected.value)
+        if not raw or raw == "" then
+            extStatus.Text = "Status: ❌ Could not read file!"
+            extStatus.TextColor3 = Color3.fromRGB(255, 80, 80)
+            return
+        end
+
+        local ok, err = pcall(function()
+            local scale = tonumber(extScaleInput.Text) or 1.0
+            local verts, faces, normals, uvs = parseOBJ(raw)
+
+            if #verts == 0 then
+                extStatus.Text = "Status: ❌ No vertices found!"
+                extStatus.TextColor3 = Color3.fromRGB(255, 80, 80)
+                return
+            end
+
+            local buildParts = objToBuildFormat(verts, faces, scale)
+            lastExtBuildData = buildParts
+            lastExtBuildJson = HttpService:JSONEncode(buildParts)
+            lastExtObjName = extObjSelected.name:gsub("%.obj$", "")
+
+            -- Save to workspace so AutoBuild can pick it up
+            local saveName = (lastExtObjName or "ext_import") .. ".build"
+            local saved = false
+            pcall(function()
+                if writefile then
+                    writefile(saveName, lastExtBuildJson)
+                    saved = true
+                end
+            end)
+
+            extStatus.Text = "Status: ✅ " .. #buildParts .. " parts ready!\n" .. (saved and ("Saved as " .. saveName .. " → switch to AutoBuild tab!") or "Switch to AutoBuild tab and use clipboard data.")
+            extStatus.TextColor3 = Color3.fromRGB(120, 255, 120)
+            notify("oxyX OBJ External", "OBJ converted! " .. (saved and ("Saved as " .. saveName .. ". ") or "") .. "Switch to AutoBuild tab.", 4)
+            switchTab(1)
+        end)
+        if not ok then
+            extStatus.Text = "Status: ❌ Error: " .. tostring(err)
+            extStatus.TextColor3 = Color3.fromRGB(255, 80, 80)
+        end
+    end)
+end)
+
+-- ============================================================
+-- PAGE 4: IMAGE LOADER
+-- ============================================================
+local p4 = tabPages[4]
+
+createLabel(p4, "🖼️ Discord Image URL:", 0, 18, Color3.fromRGB(160, 120, 220))
+createLabel(p4, "Only Discord CDN links supported (cdn.discordapp.com / media.discordapp.net)", 18, 16, Color3.fromRGB(120, 100, 160))
+
+local imgInput, _ = createInput(p4, "https://cdn.discordapp.com/attachments/...", 38, 34)
+
+createLabel(p4, "📐 Display Size (Width x Height in studs):", 80, 16, Color3.fromRGB(160, 120, 220))
+local imgSizeInput, _ = createInput(p4, "e.g. 10, 10", 100, 34)
 imgSizeInput.Text = "10, 10"
 
-createLabel(p3, "📍 Position Offset (X, Y, Z):", 142, 16, Color3.fromRGB(160, 120, 220))
-local imgPosInput, _ = createInput(p3, "e.g. 0, 5, 0", 162, 34)
+createLabel(p4, "📍 Position Offset (X, Y, Z):", 142, 16, Color3.fromRGB(160, 120, 220))
+local imgPosInput, _ = createInput(p4, "e.g. 0, 5, 0", 162, 34)
 imgPosInput.Text = "0, 5, 0"
 
-local loadImgBtn = createButton(p3, "🖼️ LOAD IMAGE IN GAME", 204, Color3.fromRGB(40, 100, 180))
-local previewImgBtn = createButton(p3, "👁️ PREVIEW IMAGE (GUI)", 250, Color3.fromRGB(80, 60, 160))
-local removeImgBtn = createButton(p3, "🗑️ REMOVE LOADED IMAGE", 296, Color3.fromRGB(140, 40, 60))
+local loadImgBtn = createButton(p4, "🖼️ LOAD IMAGE IN GAME", 204, Color3.fromRGB(40, 100, 180))
+local previewImgBtn = createButton(p4, "👁️ PREVIEW IMAGE (GUI)", 250, Color3.fromRGB(80, 60, 160))
+local removeImgBtn = createButton(p4, "🗑️ REMOVE LOADED IMAGE", 296, Color3.fromRGB(140, 40, 60))
 
-local imgStatus, _ = createStatusBox(p3, 342)
+local imgStatus, _ = createStatusBox(p4, 342)
 
 -- ============================================================
 -- IMAGE LOADER LOGIC
@@ -1020,12 +1464,6 @@ local previewGui = nil
 
 local function isDiscordUrl(url)
     return url:find("cdn%.discordapp%.com") or url:find("media%.discordapp%.net")
-end
-
-local function discordUrlToRoblox(url)
-    -- Discord CDN images can be used as decals in Roblox
-    -- We need to use the URL directly as a decal texture
-    return url
 end
 
 loadImgBtn.MouseButton1Click:Connect(function()
@@ -1060,16 +1498,14 @@ loadImgBtn.MouseButton1Click:Connect(function()
             local hrp = char:WaitForChild("HumanoidRootPart", 5)
             if not hrp then error("Character not found") end
 
-            -- Remove previous image part
             if loadedImagePart and loadedImagePart.Parent then
                 loadedImagePart:Destroy()
             end
 
-            -- Create a part with a decal
             local part = Instance.new("Part")
             part.Name = "oxyX_ImagePart"
             part.Size = Vector3.new(width, height, 0.1)
-            part.CFrame = CFrame.new(hrp.Position + offset) * CFrame.Angles(0, 0, 0)
+            part.CFrame = CFrame.new(hrp.Position + offset)
             part.Anchored = true
             part.CanCollide = false
             part.Material = Enum.Material.SmoothPlastic
@@ -1115,7 +1551,6 @@ previewImgBtn.MouseButton1Click:Connect(function()
         return
     end
 
-    -- Remove old preview
     if previewGui and previewGui.Parent then
         previewGui:Destroy()
     end
@@ -1217,23 +1652,30 @@ removeImgBtn.MouseButton1Click:Connect(function()
 end)
 
 -- ============================================================
--- PAGE 4: INFO
+-- PAGE 5: INFO
 -- ============================================================
-local p4 = tabPages[4]
+local p5 = tabPages[5]
 
 local infoLines = {
-    {"⚡ oxyX BABFT Suite", Color3.fromRGB(200, 150, 255), 16},
+    {"⚡ oxyX BABFT Suite v2.0", Color3.fromRGB(200, 150, 255), 16},
     {"Powered by oxyX Market", Color3.fromRGB(120, 80, 180), 12},
     {"", Color3.fromRGB(255,255,255), 8},
     {"🔨 AutoBuild", Color3.fromRGB(160, 120, 220), 13},
-    {"  • Only works with .build format (JSON)", Color3.fromRGB(160, 160, 200), 11},
-    {"  • Supports position, size, color, material", Color3.fromRGB(160, 160, 200), 11},
+    {"  • Select .build files from executor workspace", Color3.fromRGB(160, 160, 200), 11},
+    {"  • Only .build format accepted (e.g. ocd.build)", Color3.fromRGB(160, 160, 200), 11},
+    {"  • Supports position, size, color, material (JSON)", Color3.fromRGB(160, 160, 200), 11},
     {"", Color3.fromRGB(255,255,255), 8},
-    {"📦 OBJ Loader", Color3.fromRGB(160, 120, 220), 13},
-    {"  • Parses .obj files (v, vn, vt, f lines)", Color3.fromRGB(160, 160, 200), 11},
-    {"  • Convert OBJ → .build format", Color3.fromRGB(160, 160, 200), 11},
-    {"  • Export Roblox Studio import script", Color3.fromRGB(160, 160, 200), 11},
-    {"  • Compatible with Sketchfab exports", Color3.fromRGB(160, 160, 200), 11},
+    {"🎮 OBJ Studio (Tab 2)", Color3.fromRGB(160, 120, 220), 13},
+    {"  • For OBJ files from/for Roblox Studio", Color3.fromRGB(160, 160, 200), 11},
+    {"  • Select .obj from workspace", Color3.fromRGB(160, 160, 200), 11},
+    {"  • Generates Roblox Studio import script", Color3.fromRGB(160, 160, 200), 11},
+    {"  • Can save result as .build file", Color3.fromRGB(160, 160, 200), 11},
+    {"", Color3.fromRGB(255,255,255), 8},
+    {"📦 OBJ External (Tab 3)", Color3.fromRGB(160, 120, 220), 13},
+    {"  • For .obj files from Sketchfab, Blender, etc.", Color3.fromRGB(160, 160, 200), 11},
+    {"  • ONLY .obj format accepted (no other formats)", Color3.fromRGB(160, 160, 200), 11},
+    {"  • Select .obj from workspace", Color3.fromRGB(160, 160, 200), 11},
+    {"  • Convert to .build and save to workspace", Color3.fromRGB(160, 160, 200), 11},
     {"", Color3.fromRGB(255,255,255), 8},
     {"🖼️ Image Loader", Color3.fromRGB(160, 120, 220), 13},
     {"  • Only Discord CDN links supported", Color3.fromRGB(160, 160, 200), 11},
@@ -1241,13 +1683,14 @@ local infoLines = {
     {"", Color3.fromRGB(255,255,255), 8},
     {"🖥️ Executor Support", Color3.fromRGB(160, 120, 220), 13},
     {"  • Xeno / Velocity / Fluxus", Color3.fromRGB(160, 160, 200), 11},
+    {"  • Requires: readfile, writefile, listfiles", Color3.fromRGB(160, 160, 200), 11},
     {"", Color3.fromRGB(255,255,255), 8},
     {"Detected: " .. executor, Color3.fromRGB(120, 200, 120), 11},
 }
 
 local yOff = 0
 for _, info in ipairs(infoLines) do
-    local lbl = Instance.new("TextLabel", p4)
+    local lbl = Instance.new("TextLabel", p5)
     lbl.Size = UDim2.new(1, 0, 0, info[3] + 4)
     lbl.Position = UDim2.new(0, 0, 0, yOff)
     lbl.BackgroundTransparency = 1
@@ -1276,7 +1719,6 @@ accentGrad.Color = ColorSequence.new({
     ColorSequenceKeypoint.new(1, Color3.fromRGB(80, 30, 180))
 })
 
--- Animate accent line
 task.spawn(function()
     local t = 0
     while ScreenGui and ScreenGui.Parent do
@@ -1292,8 +1734,8 @@ end)
 MainFrame.Size = UDim2.new(0, 0, 0, 0)
 MainFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
 tween(MainFrame, {
-    Size = UDim2.new(0, 520, 0, 480),
-    Position = UDim2.new(0.5, -260, 0.5, -240)
+    Size = UDim2.new(0, 560, 0, 520),
+    Position = UDim2.new(0.5, -280, 0.5, -260)
 }, 0.5, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
 
 -- ============================================================
@@ -1305,12 +1747,17 @@ switchTab(1)
 -- STARTUP NOTIFICATION
 -- ============================================================
 task.delay(0.6, function()
-    notify("oxyX BABFT Suite", "Loaded! Executor: " .. executor, 4)
+    notify("oxyX BABFT Suite v2.0", "Loaded! Executor: " .. executor, 4)
 end)
 
 -- ============================================================
 -- END OF SCRIPT
 -- ============================================================
--- oxyX BABFT Suite v1.0
+-- oxyX BABFT Suite v2.0
 -- Powered by oxyX Market
 -- Compatible: Xeno / Velocity / Fluxus
+-- New in v2.0:
+--   • AutoBuild: File selector for .build files (workspace)
+--   • OBJ Studio tab: .obj → Roblox Studio script + .build
+--   • OBJ External tab: Sketchfab/.obj only → .build
+--   • All OBJ tabs: select file from workspace

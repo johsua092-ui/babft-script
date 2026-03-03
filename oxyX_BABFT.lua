@@ -1471,7 +1471,10 @@ buildBtn.MouseButton1Click:Connect(function()
     local hasRequired = true
     local missingList = {}
     
-    for blockName, amount in pairs(requiredBlocks) do
+    -- Fix: requiredBlocks is array {name, count}, not dictionary
+    for _, blockInfo in ipairs(requiredBlocks) do
+        local blockName = blockInfo.name
+        local amount = blockInfo.count
         if not hasBlock(blockName, amount) then
             hasRequired = false
             table.insert(missingList, blockName .. " (" .. amount .. ")")
@@ -1553,7 +1556,10 @@ buildBtn.MouseButton1Click:Connect(function()
             -- Deduct blocks from inventory after successful build
             local deducted = {}
             local failedDeduct = {}
-            for blockName, amount in pairs(requiredBlocks) do
+            -- Fix: requiredBlocks is array {name, count}, not dictionary
+            for _, blockInfo in ipairs(requiredBlocks) do
+                local blockName = blockInfo.name
+                local amount = blockInfo.count
                 if useBlock(blockName, amount) then
                     deducted[blockName] = amount
                 else

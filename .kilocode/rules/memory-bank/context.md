@@ -14,6 +14,8 @@ The template is a clean Next.js 16 starter with TypeScript and Tailwind CSS 4. I
 - [x] ESLint configuration
 - [x] Memory bank documentation
 - [x] Recipe system for common features
+- [x] oxyX BABFT Suite v1.0 — committed and pushed to GitHub (johsua092-ui/babft-script)
+- [x] oxyX BABFT Suite v2.0 — rewrote with file selector UI, split OBJ tabs, pushed to GitHub
 
 ## Current Structure
 

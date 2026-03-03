@@ -81,6 +81,23 @@ end
 local function hasBlock(blockName, amount)
     amount = amount or 1
     local inventory = getPlayerBlockInventory()
+    
+    -- Debug: Show inventory on first check
+    if not hasBlock._debugged then
+        hasBlock._debugged = true
+        local debugMsg = "Inventory detected:"
+        local count = 0
+        for name, amt in pairs(inventory) do
+            debugMsg = debugMsg .. " " .. name .. "=" .. amt
+            count = count + 1
+            if count >= 10 then break end
+        end
+        if count == 0 then
+            debugMsg = "Inventory: NONE FOUND (check leaderstats)"
+        end
+        notify("oxyX Debug", debugMsg, 5)
+    end
+    
     local available = inventory[blockName] or 0
     return available >= amount
 end
@@ -153,8 +170,17 @@ local function checkInventoryAndWarn(requiredBlocks)
     local missing = {}
     local hasEnough = true
     
-    for blockName, amount in pairs(requiredBlocks) do
+    for _, blockInfo in ipairs(requiredBlocks) do
+        local blockName = blockInfo.name
+        local amount = blockInfo.count
         local available = inventory[blockName] or 0
+        
+        -- Debug: Show what's being checked
+        if not checkInventoryAndWarn._debugShow then
+            checkInventoryAndWarn._debugShow = true
+            notify("oxyX Debug", "Checking: " .. blockName .. " need=" .. amount .. " have=" .. available, 5)
+        end
+        
         if available < amount then
             table.insert(missing, {name = blockName, needed = amount, have = available})
             hasEnough = false

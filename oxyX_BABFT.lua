@@ -74,55 +74,38 @@ local guiParent = nil
 local guiSource = "unknown"
 
 local function detectGuiParent()
-    -- Method 1: Try CoreGui
-    local success, CoreGui = pcall(game.GetService, game, "CoreGui")
-    if success and CoreGui then
-        local testGui = Instance.new("ScreenGui")
-        testGui.Name = "oxyX_Test_" .. os.time()
-        local testOk = pcall(function()
-            testGui.Parent = CoreGui
-        end)
-        if testOk and testGui.Parent then
-            guiParent = CoreGui
-            guiSource = "CoreGui"
-            testGui:Destroy()
-            return true
-        end
-    end
-    
-    -- Method 2: Try PlayerGui
-    local playerGui = player:WaitForChild("PlayerGui", 5)
+    -- Method 1: Try PlayerGui directly (most reliable)
+    local playerGui = player:FindFirstChild("PlayerGui")
     if playerGui then
-        local testGui = Instance.new("ScreenGui")
-        testGui.Name = "oxyX_Test_" .. os.time()
-        local testOk = pcall(function()
-            testGui.Parent = playerGui
-        end)
-        if testOk and testGui.Parent then
-            guiParent = playerGui
-            guiSource = "PlayerGui"
-            testGui:Destroy()
-            return true
-        end
-    end
-    
-    -- Method 3: Try StarterGui
-    local testGui = Instance.new("ScreenGui")
-    testGui.Name = "oxyX_Test_" .. os.time()
-    local testOk = pcall(function()
-        testGui.Parent = StarterGui
-    end)
-    if testOk and testGui.Parent then
-        guiParent = StarterGui
-        guiSource = "StarterGui"
-        testGui:Destroy()
+        guiParent = playerGui
+        guiSource = "PlayerGui (direct)"
+        print("[oxyX] GUI Parent found: PlayerGui (direct)")
         return true
     end
     
-    -- Fallback
-    guiParent = player:FindFirstChild("PlayerGui") or player:WaitForChild("PlayerGui")
-    guiSource = "PlayerGui (direct)"
-    return guiParent ~= nil
+    -- Method 2: Try wait for PlayerGui
+    playerGui = player:WaitForChild("PlayerGui", 5)
+    if playerGui then
+        guiParent = playerGui
+        guiSource = "PlayerGui (waited)"
+        print("[oxyX] GUI Parent found: PlayerGui (waited)")
+        return true
+    end
+    
+    -- Method 3: Try CoreGui
+    local success, CoreGui = pcall(game.GetService, game, "CoreGui")
+    if success and CoreGui then
+        guiParent = CoreGui
+        guiSource = "CoreGui"
+        print("[oxyX] GUI Parent found: CoreGui")
+        return true
+    end
+    
+    -- Method 4: Try StarterGui
+    guiParent = StarterGui
+    guiSource = "StarterGui"
+    print("[oxyX] GUI Parent found: StarterGui (fallback)")
+    return true
 end
 
 detectGuiParent()
@@ -925,13 +908,16 @@ end
 -- GUI CREATION
 -- ============================================================
 -- Destroy existing GUI
-local existingGui = nil
-pcall(function() existingGui = guiParent:FindFirstChild("oxyX_BABFT") end)
-if existingGui then pcall(function() existingGui:Destroy() end) end
-
-local existingNotif = nil
-pcall(function() existingNotif = guiParent:FindFirstChild("oxyX_Notif") end)
-if existingNotif then pcall(function() existingNotif:Destroy() end) end
+local function destroyOldGui()
+    if guiParent then
+        for _, child in ipairs(guiParent:GetChildren()) do
+            if child.Name == "oxyX_BABFT" or child.Name:find("oxyX_Notif") then
+                pcall(function() child:Destroy() end)
+            end
+        end
+    end
+end
+destroyOldGui()
 
 -- Create ScreenGui
 local ScreenGui = Instance.new("ScreenGui")
@@ -940,32 +926,43 @@ ScreenGui.ResetOnSpawn = false
 ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 ScreenGui.IgnoreGuiInset = true
 
-local guiCreated = false
-local guiError = nil
-
-if guiParent then
-    guiCreated, guiError = pcall(function()
+-- Try to set parent
+local function trySetParent()
+    if not guiParent then return false end
+    
+    -- Try direct parent first
+    local success, err = pcall(function()
         ScreenGui.Parent = guiParent
     end)
-end
-
-if not guiCreated or not ScreenGui.Parent then
+    
+    if success and ScreenGui.Parent then
+        return true
+    end
+    
+    -- Try PlayerGui as fallback
     local playerGui = player:FindFirstChild("PlayerGui")
-    if playerGui then
-        guiCreated, guiError = pcall(function()
+    if playerGui and playerGui ~= guiParent then
+        success, err = pcall(function()
             ScreenGui.Parent = playerGui
         end)
+        if success and ScreenGui.Parent then
+            return true
+        end
     end
+    
+    return false
 end
 
-if not guiCreated or not ScreenGui.Parent then
+if not trySetParent() then
+    warn("[oxyX] WARNING: Could not set GUI parent properly")
+    -- Try StarterGui as last resort
     pcall(function()
         ScreenGui.Parent = StarterGui
     end)
 end
 
 if not ScreenGui.Parent then
-    error("[oxyX] CRITICAL: Could not create GUI!")
+    warn("[oxyX] CRITICAL: GUI has no parent, but continuing...")
 end
 
 -- ============================================================
@@ -2427,14 +2424,49 @@ end)
 -- ============================================================
 -- SHOW GUI
 -- ============================================================
-task.delay(0.1, function()
+local function showGUI()
     pcall(function()
-        ScreenGui.Enabled = true
-        MainFrame.Visible = true
-        MainFrame.Size = UDim2.new(0, 620, 0, 680)
-        MainFrame.Position = UDim2.new(0.5, -310, 0.5, -340)
+        if ScreenGui and ScreenGui.Parent then
+            ScreenGui.Enabled = true
+            print("[oxyX] GUI Enabled = true")
+        else
+            print("[oxyX] WARNING: ScreenGui has no parent, trying to recreate...")
+            -- Try to recreate GUI
+            local playerGui = player:FindFirstChild("PlayerGui")
+            if playerGui then
+                ScreenGui.Parent = playerGui
+                ScreenGui.Enabled = true
+                print("[oxyX] GUI recreated in PlayerGui")
+            end
+        end
+        
+        if MainFrame then
+            MainFrame.Visible = true
+            MainFrame.Size = UDim2.new(0, 620, 0, 680)
+            MainFrame.Position = UDim2.new(0.5, -310, 0.5, -340)
+            print("[oxyX] MainFrame should now be visible")
+        else
+            print("[oxyX] ERROR: MainFrame is nil!")
+        end
     end)
-    notify("oxyX BABFT v" .. SCRIPT_VERSION, "Loaded! " .. SCRIPT_TAG .. " | " .. rawExecutor, 5)
+    
+    -- Show notification
+    pcall(function()
+        notify("oxyX BABFT v" .. SCRIPT_VERSION, "Loaded! " .. SCRIPT_TAG .. " | " .. rawExecutor, 5)
+    end)
+end
+
+-- Show GUI after short delay
+task.delay(0.1, showGUI)
+
+-- Also try showing immediately in case delay fails
+task.delay(0.5, function()
+    pcall(function()
+        if MainFrame and not MainFrame.Visible then
+            MainFrame.Visible = true
+            print("[oxyX] Backup: MainFrame visibility set to true")
+        end
+    end)
 end)
 
 -- ============================================================

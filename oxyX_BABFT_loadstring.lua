@@ -9,7 +9,7 @@
 ]]
 
 local SCRIPT_VERSION = "1.2.0"
-local RAW_URL = "https://raw.githubusercontent.com/johsua092-ui/babft-script/refs/heads/main/oxyX_BABFT.lua"
+local RAW_URL = "https://raw.githubusercontent.com/johsua092-ui/babft-script/main/oxyX_BABFT.lua"
 
 -- Debug function
 local function debugPrint(...)
@@ -29,13 +29,21 @@ end
 
 -- Main loadstring
 local function loadBabft()
-    debugPrint("Fetching script from GitHub...")
+    debugPrint("Starting main load function...")
+    
+    -- Test if game:HttpGet works
+    debugPrint("Testing game.HttpGet availability...")
+    if not game.HttpGet then
+        warn("[oxyX] game.HttpGet is nil - checking alternatives...")
+    else
+        debugPrint("game.HttpGet is available")
+    end
     
     local success, result = pcall(function()
-        -- Try HTTP GET first
-        if game.HttpGet then
-            local scriptContent = game:HttpGet(RAW_URL)
-            debugPrint("Got content, length: " .. #scriptContent)
+        debugPrint("Attempting HTTP GET to: " .. RAW_URL)
+        local scriptContent = game:HttpGet(RAW_URL)
+        debugPrint("HTTP GET completed!")
+        debugPrint("Got content, length: " .. #scriptContent)
             
             if scriptContent and #scriptContent > 1000 then
                 debugPrint("Executing loadstring...")
@@ -58,10 +66,15 @@ local function loadBabft()
     end)
     
     if success then
-        debugPrint("Done!")
+        debugPrint("Load function completed!")
     else
         warn("[oxyX BABFT] Error: " .. tostring(result))
+        warn("[oxyX] If you see no debug output above, HTTP may be blocked or failing.")
     end
 end
 
-loadBabft()
+-- Try to load with delay in case game hasn't fully loaded
+task.delay(0.5, function()
+    debugPrint("Executing loadBabft() after delay...")
+    loadBabft()
+end)

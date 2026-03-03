@@ -12,6 +12,8 @@
 -- ============================================================
 -- Build A Boat For Treasure block inventory system
 
+local HttpService = game:GetService("HttpService")
+
 -- Try to get BABFT block inventory from various possible locations
 local function getPlayerBlockInventory()
     local inventory = {}
@@ -230,7 +232,6 @@ end
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
-local HttpService = game:GetService("HttpService")
 local UserInputService = game:GetService("UserInputService")
 local CoreGui = game:GetService("CoreGui")
 

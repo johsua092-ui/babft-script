@@ -397,7 +397,7 @@ local function analyzeBuildBlocks(buildData)
     -- DEBUG: Show how many parts we're analyzing
     notify("oxyX Debug", "Analyzing " .. #buildData .. " parts...", 3)
     
-    -- DEBUG: Show sample of first part's keys
+    -- DEBUG: Show sample of first part's keys AND raw data
     if #buildData > 0 and type(buildData[1]) == "table" then
         local sampleKeys = ""
         for k, v in pairs(buildData[1]) do
@@ -405,16 +405,16 @@ local function analyzeBuildBlocks(buildData)
         end
         notify("oxyX Debug", "Sample keys: " .. sampleKeys, 5)
         
-        -- Show raw Block value
-        local rawBlock = buildData[1].Block or buildData[1].b or buildData[1].Material or buildData[1].mat or "N/A"
-        notify("oxyX Debug", "Block value: " .. tostring(rawBlock), 5)
+        -- Also show the raw value of first part
+        local rawValue = tostring(buildData[1].Block or buildData[1].b or buildData[1].Material or buildData[1].mat or "N/A")
+        notify("oxyX Debug", "Block value: " .. rawValue, 5)
     end
     
-    -- Test inventory detection
-    local testInv = getPlayerBlockInventory()
+    -- DEBUG: Show detected inventory
+    local testInventory = getPlayerBlockInventory()
     local invCount = 0
     local invSample = ""
-    for k, v in pairs(testInv) do
+    for k, v in pairs(testInventory) do
         invCount = invCount + 1
         if invCount <= 5 then
             invSample = invSample .. k .. "=" .. v .. " "

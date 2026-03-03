@@ -4,7 +4,7 @@
 -- ██║   ██║ ██╔██╗   ╚██╔╝   ██╔██╗ 
 -- ╚██████╔╝██╔╝ ██╗   ██║   ██╔╝ ██╗
 --  ╚═════╝ ╚═╝  ╚═╝   ╚═╝   ╚═╝  ╚═╝
--- oxyX BABFT Suite v2.1 | Powered by oxyX Market
+-- oxyX BABFT Suite v2.2 | Powered by oxyX Market
 -- Compatible: Xeno / Velocity / Fluxus
 
 -- ============================================================
@@ -18,30 +18,30 @@ local HttpService = game:GetService("HttpService")
 local function getPlayerBlockInventory()
     local inventory = {}
     
+    -- FIRST: Try to get real BABFT inventory from the game
     pcall(function()
-        -- Method 1: leaderstats (common in many games)
+        -- Method 1: BABFT uses leaderstats with "Blocks" folder
         if player:FindFirstChild("leaderstats") then
             local leaderstats = player.leaderstats
-            for _, stat in ipairs(leaderstats:GetChildren()) do
-                if stat:IsA("IntValue") or stat:IsA("NumberValue") then
-                    inventory[stat.Name] = stat.Value
-                elseif stat:IsA("StringValue") then
-                    -- Might be JSON encoded inventory
-                    local ok, decoded = pcall(function()
-                        return HttpService:JSONDecode(stat.Value)
-                    end)
-                    if ok and type(decoded) == "table" then
-                        for blockName, count in pairs(decoded) do
-                            inventory[blockName] = count
-                        end
+            local blocksFolder = leaderstats:FindFirstChild("Blocks")
+            if blocksFolder and blocksFolder:IsA("Folder") then
+                for _, block in ipairs(blocksFolder:GetChildren()) do
+                    if block:IsA("IntValue") or block:IsA("NumberValue") then
+                        inventory[block.Name] = block.Value
                     end
+                end
+            end
+            -- Also check if blocks are directly in leaderstats
+            for _, stat in ipairs(leaderstats:GetChildren()) do
+                if (stat:IsA("IntValue") or stat:IsA("NumberValue")) and stat.Name ~= "Cash" and stat.Name ~= "Kills" then
+                    inventory[stat.Name] = stat.Value
                 end
             end
         end
     end)
     
+    -- Method 2: Direct child named "Blocks" or "Inventory"
     pcall(function()
-        -- Method 2: Direct child named "Blocks" or "Inventory"
         local inventoryObj = player:FindFirstChild("Blocks") or player:FindFirstChild("Inventory") or player:FindFirstChild("BlockInventory")
         if inventoryObj then
             for _, block in ipairs(inventoryObj:GetChildren()) do
@@ -57,8 +57,8 @@ local function getPlayerBlockInventory()
         end
     end)
     
+    -- Method 3: Player data in ReplicatedStorage
     pcall(function()
-        -- Method 3: Player data in ReplicatedStorage (some games)
         local rs = game:GetService("ReplicatedStorage")
         local playerData = rs:FindFirstChild("PlayerData") or rs:FindFirstChild("Inventories")
         if playerData then
@@ -71,6 +71,22 @@ local function getPlayerBlockInventory()
                             inventory[block.Name] = block.Value
                         end
                     end
+                end
+            end
+        end
+    end)
+    
+    -- Method 4: Try RemoteFunction to get inventory from server
+    pcall(function()
+        local rs = game:GetService("ReplicatedStorage")
+        local getInvRemote = rs:FindFirstChild("GetInventory") or rs:FindFirstChild("GetBlocks") or rs:FindFirstChild("RequestInventory")
+        if getInvRemote and getInvRemote:IsA("RemoteFunction") then
+            local ok, result = pcall(function()
+                return getInvRemote:InvokeServer()
+            end)
+            if ok and type(result) == "table" then
+                for blockName, count in pairs(result) do
+                    inventory[blockName] = tonumber(count) or 0
                 end
             end
         end
@@ -321,12 +337,11 @@ local function writeWorkspaceFile(path, content)
 end
 
 -- ============================================================
--- BLOCK LIBRARY SYSTEM
+-- BABFT BLOCK LIBRARY - Complete list of BABFT blocks
 -- ============================================================
--- Define available blocks in Roblox (material -> color info)
 local blockLibrary = {
-    -- Basic blocks
-    {name = "SmoothPlastic", material = "SmoothPlastic", color = {r=163, g=162, b=165}, unlocked = true},
+    -- Basic blocks (all players have these)
+    {name = "Smooth Plastic", material = "SmoothPlastic", color = {r=163, g=162, b=165}, unlocked = true},
     {name = "Wood", material = "Wood", color = {r=163, g=162, b=165}, unlocked = true},
     {name = "Wood Plank", material = "Wood", color = {r=143, g=130, b=100}, unlocked = true},
     {name = "Metal", material = "Metal", color = {r=192, g=192, b=192}, unlocked = true},
@@ -338,21 +353,40 @@ local blockLibrary = {
     {name = "Grass", material = "Grass", color = {r=67, g=205, b=128}, unlocked = true},
     {name = "Sand", material = "Sand", color = {r=237, g=201, b=175}, unlocked = true},
     {name = "Stone", material = "Cobblestone", color = {r=128, g=128, b=128}, unlocked = true},
+    
+    -- Premium blocks
     {name = "Marble", material = "Marble", color = {r=230, g=225, b=220}, unlocked = false},
     {name = "Granite", material = "Granite", color = {r=140, g=140, b=140}, unlocked = false},
     {name = "Obsidian", material = "Obsidian", color = {r=30, g=30, b=35}, unlocked = false},
     {name = "Cinderblock", material = "Cinderblock", color = {r=90, g=90, b=90}, unlocked = false},
     {name = "Corrosion", material = "Corrosion", color = {r=100, g=120, b=80}, unlocked = false},
-    {name = "DiamondPlate", material = "DiamondPlate", color = {r=180, g=180, b=190}, unlocked = false},
+    {name = "Diamond Plate", material = "DiamondPlate", color = {r=180, g=180, b=190}, unlocked = false},
     {name = "Foil", material = "Foil", color = {r=200, g=200, b=210}, unlocked = false},
     {name = "Pearl", material = "Pearl", color = {r=230, g=230, b=235}, unlocked = false},
     {name = "Plaster", material = "Plaster", color = {r=220, g=215, b=205}, unlocked = false},
+    
+    -- Neon colors
     {name = "Neon Pink", material = "Neon", color = {r=255, g=0, b=127}, unlocked = false},
     {name = "Neon Green", material = "Neon", color = {r=50, g=255, b=50}, unlocked = false},
     {name = "Neon Blue", material = "Neon", color = {r=0, g=150, b=255}, unlocked = false},
     {name = "Neon Red", material = "Neon", color = {r=255, g=50, b=50}, unlocked = false},
     {name = "Neon Orange", material = "Neon", color = {r=255, g=150, b=0}, unlocked = false},
     {name = "Neon Purple", material = "Neon", color = {r=180, g=50, b=255}, unlocked = false},
+    
+    -- Additional BABFT-specific blocks (by color)
+    {name = "Brown", material = "Wood", color = {r=139, g=69, b=19}, unlocked = true},
+    {name = "Tan", material = "Wood", color = {r=210, g=180, b=140}, unlocked = true},
+    {name = "Light Stone", material = "Slate", color = {r=160, g=160, b=160}, unlocked = true},
+    {name = "Dark Stone", material = "Slate", color = {r=80, g=80, b=80}, unlocked = true},
+    {name = "Red", material = "Brick", color = {r=196, g=40, b=28}, unlocked = true},
+    {name = "Blue", material = "Brick", color = {r=13, g=105, b=172}, unlocked = true},
+    {name = "Yellow", material = "Brick", color = {r=255, g=198, b=38}, unlocked = true},
+    {name = "Green", material = "Brick", color = {r=75, g=151, b=75}, unlocked = true},
+    {name = "White", material = "SmoothPlastic", color = {r=242, g=242, b=242}, unlocked = true},
+    {name = "Black", material = "SmoothPlastic", color = {r=17, g=17, b=17}, unlocked = true},
+    {name = "Gray", material = "SmoothPlastic", color = {r=128, g=128, b=128}, unlocked = true},
+    {name = "Light Gray", material = "SmoothPlastic", color = {r=191, g=191, b=191}, unlocked = true},
+    {name = "Dark Gray", material = "SmoothPlastic", color = {r=64, g=64, b=64}, unlocked = true},
 }
 
 -- Function to analyze build and find required blocks
@@ -370,15 +404,31 @@ local function analyzeBuildBlocks(buildData)
             sampleKeys = sampleKeys .. tostring(k) .. "=" .. type(v) .. " "
         end
         notify("oxyX Debug", "Sample keys: " .. sampleKeys, 5)
+        
+        -- Show raw Block value
+        local rawBlock = buildData[1].Block or buildData[1].b or buildData[1].Material or buildData[1].mat or "N/A"
+        notify("oxyX Debug", "Block value: " .. tostring(rawBlock), 5)
     end
+    
+    -- Test inventory detection
+    local testInv = getPlayerBlockInventory()
+    local invCount = 0
+    local invSample = ""
+    for k, v in pairs(testInv) do
+        invCount = invCount + 1
+        if invCount <= 5 then
+            invSample = invSample .. k .. "=" .. v .. " "
+        end
+    end
+    notify("oxyX Debug", "Detected " .. invCount .. " inv types: " .. (invSample ~= "" and invSample or "NONE"), 5)
     
     for _, partData in ipairs(buildData) do
         if type(partData) == "table" then
-            -- Try ALL possible field names for material
+            -- Try ALL possible field names for material - get raw value first
             local mat = nil
             
-            -- Check common field names (case insensitive)
-            local fieldsToCheck = {"Block", "Material", "material", "BLOCK", "MAT", "mat", "Type", "type", "b", "m"}
+            -- Priority order for field names (most common first)
+            local fieldsToCheck = {"Block", "b", "Material", "mat", "BLOCK", "MAT", "Type", "type", "m"}
             for _, field in ipairs(fieldsToCheck) do
                 if partData[field] ~= nil then
                     mat = tostring(partData[field])
@@ -389,14 +439,13 @@ local function analyzeBuildBlocks(buildData)
             -- Default to SmoothPlastic if no material found
             mat = mat or "SmoothPlastic"
             
-            -- Try to find color info
+            -- Try to find color info (for additional matching)
             local color = {r=163, g=162, b=165}
             for _, field in ipairs({"Color", "color", "c", "Colour"}) do
                 if partData[field] ~= nil then
                     if type(partData[field]) == "table" then
                         color = partData[field]
                     elseif type(partData[field]) == "string" then
-                        -- Try to parse hex color
                         local hex = partData[field]:match("#?(%x%x%x%x%x%x)")
                         if hex then
                             color.r = tonumber(hex:sub(1,2), 16)
@@ -408,20 +457,28 @@ local function analyzeBuildBlocks(buildData)
                 end
             end
             
-            -- Find matching block from library
-            local blockName = mat
+            -- FLEXIBLE BLOCK MATCHING: First try exact material name match, then color match
+            local blockName = mat  -- Default to material name
             local found = false
             
+            -- Method 1: Exact match on material name
             for _, block in ipairs(blockLibrary) do
                 if block.material:lower() == mat:lower() then
-                    local colorR = color.r or color.R or 163
-                    local colorG = color.g or color.G or 162
-                    local colorB = color.b or color.B or 165
-                    
-                    local colorMatch = math.abs(block.color.r - colorR) < 20
-                        and math.abs(block.color.g - colorG) < 20
-                        and math.abs(block.color.b - colorB) < 20
-                    if colorMatch then
+                    blockName = block.name
+                    found = true
+                    break
+                end
+            end
+            
+            -- Method 2: If no exact match, try color matching
+            if not found then
+                local colorR = color.r or color.R or 163
+                local colorG = color.g or color.G or 162
+                local colorB = color.b or color.B or 165
+                
+                for _, block in ipairs(blockLibrary) do
+                    local colorDiff = math.abs(block.color.r - colorR) + math.abs(block.color.g - colorG) + math.abs(block.color.b - colorB)
+                    if colorDiff < 60 then  -- Allow larger color tolerance
                         blockName = block.name
                         found = true
                         break
@@ -429,9 +486,10 @@ local function analyzeBuildBlocks(buildData)
                 end
             end
             
-            -- If no match found, use the material name directly
+            -- If still no match, use the raw material name with proper formatting
             if not found then
-                blockName = mat
+                -- Capitalize first letter
+                blockName = mat:sub(1,1):upper() .. mat:sub(2):lower()
             end
             
             blockCounts[blockName] = (blockCounts[blockName] or 0) + 1
@@ -445,11 +503,11 @@ local function analyzeBuildBlocks(buildData)
         debugBlocks = debugBlocks .. name .. "=" .. cnt .. " "
         count = count + 1
     end
-    notify("oxyX Debug", "Found " .. count .. " block types: " .. debugBlocks, 5)
+    notify("oxyX Debug", "Found " .. count .. " block types: " .. (debugBlocks ~= "" and debugBlocks or "NONE"), 5)
     
-    -- Warning if only SmoothPlastic
-    if count == 1 and blockCounts["SmoothPlastic"] then
-        notify("oxyX Warning", "Only SmoothPlastic detected! File format might be wrong.", 5)
+    -- Warning if no blocks found
+    if count == 0 then
+        notify("oxyX Warning", "No blocks detected! Check .build file format.", 5)
     end
     
     -- Convert to sorted list
@@ -587,7 +645,7 @@ local TitleLabel = Instance.new("TextLabel", TitleBar)
 TitleLabel.Size = UDim2.new(1, -100, 1, 0)
 TitleLabel.Position = UDim2.new(0, 14, 0, 0)
 TitleLabel.BackgroundTransparency = 1
-TitleLabel.Text = "⚡ oxyX BABFT Suite v2.1"
+TitleLabel.Text = "⚡ oxyX BABFT Suite v2.2"
 TitleLabel.TextColor3 = Color3.fromRGB(200, 150, 255)
 TitleLabel.Font = Enum.Font.GothamBold
 TitleLabel.TextSize = 16
@@ -1486,13 +1544,42 @@ createLabel(p1, "📍 Build Position Offset (X, Y, Z):", finalBuildControlsY + 6
 local posInput, _ = createInput(p1, "e.g. 0, 5, 0", finalBuildControlsY + 78, 34)
 posInput.Text = "0, 5, 0"
 
-local buildBtn = createButton(p1, "🔨 START AUTOBUILD", finalBuildControlsY + 120, Color3.fromRGB(80, 40, 180))
-local stopBuildBtn = createButton(p1, "⏹ STOP BUILD", finalBuildControlsY + 166, Color3.fromRGB(160, 40, 80))
+-- Skip Inventory Check toggle
+local skipInvCheck = false
+local skipInvBtn = Instance.new("TextButton", p1)
+skipInvBtn.Size = UDim2.new(1, 0, 0, 30)
+skipInvBtn.Position = UDim2.new(0, 0, 0, finalBuildControlsY + 112)
+skipInvBtn.BackgroundColor3 = Color3.fromRGB(40, 80, 40)
+skipInvBtn.Text = "✓ Skip Inventory Check (FORCE BUILD)"
+skipInvBtn.TextColor3 = Color3.fromRGB(200, 255, 200)
+skipInvBtn.Font = Enum.Font.GothamBold
+skipInvBtn.TextSize = 11
+skipInvBtn.BorderSizePixel = 0
+skipInvBtn.AutoButtonColor = false
+
+local skipCorner = Instance.new("UICorner", skipInvBtn)
+skipCorner.CornerRadius = UDim.new(0, 6)
+
+skipInvBtn.MouseButton1Click:Connect(function()
+    skipInvCheck = not skipInvCheck
+    if skipInvCheck then
+        skipInvBtn.BackgroundColor3 = Color3.fromRGB(80, 40, 40)
+        skipInvBtn.Text = "✗ SKIP INVENTORY CHECK ENABLED"
+        skipInvBtn.TextColor3 = Color3.fromRGB(255, 200, 200)
+    else
+        skipInvBtn.BackgroundColor3 = Color3.fromRGB(40, 80, 40)
+        skipInvBtn.Text = "✓ Skip Inventory Check (FORCE BUILD)"
+        skipInvBtn.TextColor3 = Color3.fromRGB(200, 255, 200)
+    end
+end)
+
+local buildBtn = createButton(p1, "🔨 START AUTOBUILD", finalBuildControlsY + 156, Color3.fromRGB(80, 40, 180))
+local stopBuildBtn = createButton(p1, "⏹ STOP BUILD", finalBuildControlsY + 202, Color3.fromRGB(160, 40, 80))
 
 -- Inventory check button
-local checkInvBtn = createButton(p1, "🎒 CHECK INVENTORY", finalBuildControlsY + 212, Color3.fromRGB(40, 120, 160))
+local checkInvBtn = createButton(p1, "🎒 CHECK INVENTORY", finalBuildControlsY + 248, Color3.fromRGB(40, 120, 160))
 
-local buildStatus, _ = createStatusBox(p1, finalBuildControlsY + 212)
+local buildStatus, _ = createStatusBox(p1, finalBuildControlsY + 248)
 
 -- ============================================================
 -- AUTOBUILD LOGIC
@@ -1587,34 +1674,41 @@ buildBtn.MouseButton1Click:Connect(function()
     end
     task.wait(0.5)
     
-    local hasRequired = true
-    local missingList = {}
-    
-    -- Fix: requiredBlocks is array {name, count}, not dictionary
-    for _, blockInfo in ipairs(requiredBlocks) do
-        local blockName = blockInfo.name
-        local amount = blockInfo.count
+    -- Check inventory unless skip is enabled
+    if skipInvCheck then
+        buildStatus.Text = "Status: ⏭️ Skipping inventory check!"
+        buildStatus.TextColor3 = Color3.fromRGB(255, 200, 100)
+        notify("oxyX AutoBuild", "Skipping inventory check - FORCE BUILD", 4)
+    else
+        local hasRequired = true
+        local missingList = {}
         
-        -- DEBUG: Show checking inventory
-        buildStatus.Text = "Status: 📊 Checking " .. blockName .. " (" .. amount .. ")..."
-        buildStatus.TextColor3 = Color3.fromRGB(120, 200, 255)
-        task.wait(0.1)
-        
-        if not hasBlock(blockName, amount) then
-            hasRequired = false
-            table.insert(missingList, blockName .. " (" .. amount .. ")")
+        -- Fix: requiredBlocks is array {name, count}, not dictionary
+        for _, blockInfo in ipairs(requiredBlocks) do
+            local blockName = blockInfo.name
+            local amount = blockInfo.count
+            
+            -- DEBUG: Show checking inventory
+            buildStatus.Text = "Status: 📊 Checking " .. blockName .. " (" .. amount .. ")..."
+            buildStatus.TextColor3 = Color3.fromRGB(120, 200, 255)
+            task.wait(0.1)
+            
+            if not hasBlock(blockName, amount) then
+                hasRequired = false
+                table.insert(missingList, blockName .. " (" .. amount .. ")")
+            end
         end
+        
+        if not hasRequired then
+            buildStatus.Text = "Status: ⚠️ Missing blocks! Build cancelled."
+            buildStatus.TextColor3 = Color3.fromRGB(255, 180, 80)
+            notify("oxyX Inventory", "Missing: " .. table.concat(missingList, ", "), 5)
+            return
+        end
+        
+        buildStatus.Text = "Status: ✅ Inventory OK! Starting build..."
+        buildStatus.TextColor3 = Color3.fromRGB(120, 255, 120)
     end
-    
-    if not hasRequired then
-        buildStatus.Text = "Status: ⚠️ Missing blocks! Build cancelled."
-        buildStatus.TextColor3 = Color3.fromRGB(255, 180, 80)
-        notify("oxyX Inventory", "Missing: " .. table.concat(missingList, ", "), 5)
-        return
-    end
-    
-    buildStatus.Text = "Status: ✅ Inventory OK! Starting build..."
-    buildStatus.TextColor3 = Color3.fromRGB(120, 255, 120)
 
     buildRunning = true
     buildStatus.Text = "Status: 🔨 Building... (0/" .. #buildData .. ") from " .. buildFileSelected.name
@@ -1871,7 +1965,7 @@ local function objToRobloxStudioScript(vertices, faces, scale, objName)
     objName = objName or "OBJ_Import"
     local lines = {}
     table.insert(lines, "-- oxyX OBJ → Roblox Studio Import Script")
-    table.insert(lines, "-- Generated by oxyX BABFT Suite v2.1 | Powered by oxyX Market")
+    table.insert(lines, "-- Generated by oxyX BABFT Suite v2.2 | Powered by oxyX Market")
     table.insert(lines, "-- Paste this into Roblox Studio Command Bar or a Script")
     table.insert(lines, "-- Source: Roblox Studio OBJ format")
     table.insert(lines, "")
@@ -2468,7 +2562,7 @@ end)
 local p5 = tabPages[5]
 
 local infoLines = {
-    {"⚡ oxyX BABFT Suite v2.1", Color3.fromRGB(200, 150, 255), 16},
+    {"⚡ oxyX BABFT Suite v2.2", Color3.fromRGB(200, 150, 255), 16},
     {"Powered by oxyX Market", Color3.fromRGB(120, 80, 180), 12},
     {"", Color3.fromRGB(255,255,255), 8},
     {"🔨 AutoBuild", Color3.fromRGB(160, 120, 220), 13},
@@ -2558,13 +2652,13 @@ switchTab(1)
 -- STARTUP NOTIFICATION
 -- ============================================================
 task.delay(0.6, function()
-    notify("oxyX BABFT Suite v2.1", "Loaded! Executor: " .. executor, 4)
+    notify("oxyX BABFT Suite v2.2", "Loaded! Executor: " .. executor, 4)
 end)
 
 -- ============================================================
 -- END OF SCRIPT
 -- ============================================================
--- oxyX BABFT Suite v2.1
+-- oxyX BABFT Suite v2.2
 -- Powered by oxyX Market
 -- Compatible: Xeno / Velocity / Fluxus
 -- New in v2.0:

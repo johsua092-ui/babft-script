@@ -5,7 +5,7 @@
 ██║   ██║ ██╔██╗   ╚██╔╝   ██╔██╗ 
 ╚██████╔╝██╔╝ ██╗   ██║   ██╔╝ ██╗
  ╚═════╝ ╚═╝  ╚═╝   ╚═╝   ╚═╝  ╚═╝
- oxyX BABFT Suite v2.5 (Fixed) | Powered by oxyX Market
+ oxyX BABFT Suite v2.6 - Save Other Build | Powered by oxyX Market
  Compatible: Xeno / Velocity / Fluxus / Synapse / etc
 ]]
 
@@ -39,80 +39,75 @@ local Debris = game:GetService("Debris")
 local player = Players.LocalPlayer
 local mouse = player:GetMouse()
 
--- ============================================================
--- GUI PARENT DETECTION (Simplified for Xeno compatibility)
--- ============================================================
+-- Try multiple GUI parents with better detection
 local guiParent = nil
 local guiSource = "unknown"
 
--- Try CoreGui first (most executors support this)
-local function tryCoreGui()
-    local coreGuiSuccess, coreGui = pcall(game.GetService, game, "CoreGui")
-    if coreGuiSuccess and coreGui then
-        local testGui = Instance.new("ScreenGui")
-        testGui.Name = "oxyX_Test_" .. os.time()
-        local testOk, err = pcall(function()
-            testGui.Parent = coreGui
-        end)
-        if testOk and testGui.Parent and coreGui:FindFirstChild(testGui.Name) then
-            testGui:Destroy()
-            return coreGui, "CoreGui"
-        end
+-- Method 1: Try CoreGui
+local success, CoreGui = pcall(game.GetService, game, "CoreGui")
+if success and CoreGui then
+    local testGui = Instance.new("ScreenGui")
+    testGui.Name = "oxyX_Test_" .. os.time()
+    local testOk = pcall(function()
+        testGui.Parent = CoreGui
+    end)
+    if testOk and testGui.Parent then
+        guiParent = CoreGui
+        guiSource = "CoreGui"
         testGui:Destroy()
     end
-    return nil, "CoreGui failed"
 end
 
--- Try PlayerGui
-local function tryPlayerGui()
-    local playerGui = player:FindFirstChild("PlayerGui")
+-- Method 2: Try PlayerGui
+if not guiParent then
+    local playerGui = player:WaitForChild("PlayerGui", 5)
     if playerGui then
         local testGui = Instance.new("ScreenGui")
         testGui.Name = "oxyX_Test_" .. os.time()
-        local testOk, err = pcall(function()
+        local testOk = pcall(function()
             testGui.Parent = playerGui
         end)
-        if testOk and testGui.Parent and playerGui:FindFirstChild(testGui.Name) then
+        if testOk and testGui.Parent then
+            guiParent = playerGui
+            guiSource = "PlayerGui"
             testGui:Destroy()
-            return playerGui, "PlayerGui"
         end
-        testGui:Destroy()
     end
-    return nil, "PlayerGui failed"
 end
 
--- Try StarterGui
-local function tryStarterGui()
+-- Method 3: Try StarterGui (some executors)
+if not guiParent then
     local testGui = Instance.new("ScreenGui")
     testGui.Name = "oxyX_Test_" .. os.time()
-    local testOk, err = pcall(function()
+    local testOk = pcall(function()
         testGui.Parent = StarterGui
     end)
-    if testOk and testGui.Parent and StarterGui:FindFirstChild(testGui.Name) then
+    if testOk and testGui.Parent then
+        guiParent = StarterGui
+        guiSource = "StarterGui"
         testGui:Destroy()
-        return StarterGui, "StarterGui"
     end
-    testGui:Destroy()
-    return nil, "StarterGui failed"
 end
 
--- Try each method
-guiParent, guiSource = tryCoreGui()
+-- Ultimate fallback: create a ScreenGui and attach to player
 if not guiParent then
-    guiParent, guiSource = tryPlayerGui()
-end
-if not guiParent then
-    guiParent, guiSource = tryStarterGui()
+    warn("[oxyX] Using fallback GUI method")
+    local fallbackGui = Instance.new("ScreenGui")
+    fallbackGui.Name = "oxyX_Fallback_" .. os.time()
+    pcall(function()
+        fallbackGui.Parent = player:WaitForChild("PlayerGui", 10)
+    end)
+    if fallbackGui.Parent then
+        guiParent = fallbackGui.Parent
+        guiSource = "PlayerGui (fallback)"
+    else
+        -- Just set to playerGui directly
+        guiParent = player:FindFirstChild("PlayerGui") or player:WaitForChild("PlayerGui")
+        guiSource = "PlayerGui (direct)"
+    end
 end
 
--- Ultimate fallback: just use PlayerGui directly without testing
-if not guiParent then
-    warn("[oxyX] All GUI detection methods failed, using PlayerGui directly")
-    guiParent = player:FindFirstChild("PlayerGui") or player:WaitForChild("PlayerGui", 10)
-    guiSource = "PlayerGui (direct)"
-end
-
-print("[oxyX] GUI Parent detected: " .. guiSource)
+print("[oxyX] GUI Parent: " .. guiSource)
 
 -- ============================================================
 -- UTILITY FUNCTIONS
@@ -467,87 +462,70 @@ local function writeWorkspaceFile(path, content)
 end
 
 -- ============================================================
--- GUI CREATION (Simplified for compatibility)
+-- GUI CREATION
 -- ============================================================
 -- Destroy existing GUI
 local existingGui = nil
-pcall(function() 
-    if guiParent then
-        existingGui = guiParent:FindFirstChild("oxyX_BABFT") 
-    end
-end)
+pcall(function() existingGui = guiParent:FindFirstChild("oxyX_BABFT") end)
 if existingGui then pcall(function() existingGui:Destroy() end) end
 
 local existingNotif = nil
-pcall(function() 
-    if guiParent then
-        existingNotif = guiParent:FindFirstChild("oxyX_Notif") 
-    end
-end)
+pcall(function() existingNotif = guiParent:FindFirstChild("oxyX_Notif") end)
 if existingNotif then pcall(function() existingNotif:Destroy() end) end
 
--- Create ScreenGui - simple approach
+-- Create ScreenGui with error handling
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "oxyX_BABFT"
 ScreenGui.ResetOnSpawn = false
 ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 ScreenGui.IgnoreGuiInset = true
 
--- Direct parent assignment (no complex error handling)
-local function setGuiParent()
-    if not guiParent then
-        -- Fallback to PlayerGui
-        guiParent = player:FindFirstChild("PlayerGui")
-        guiSource = "PlayerGui (fallback)"
-    end
-    
-    if guiParent then
-        local ok, err = pcall(function()
-            ScreenGui.Parent = guiParent
+-- Try to set parent with error handling
+local guiCreated = false
+local guiError = nil
+
+-- Try current guiParent
+if guiParent then
+    guiCreated, guiError = pcall(function()
+        ScreenGui.Parent = guiParent
+    end)
+end
+
+-- If failed, try PlayerGui
+if not guiCreated or not ScreenGui.Parent then
+    local playerGui = player:FindFirstChild("PlayerGui")
+    if playerGui then
+        guiCreated, guiError = pcall(function()
+            ScreenGui.Parent = playerGui
         end)
-        if not ok then
-            warn("[oxyX] Failed to set GUI parent: " .. tostring(err))
-            -- Try PlayerGui directly
-            local pg = player:FindFirstChild("PlayerGui")
-            if pg and pg ~= guiParent then
-                ok, err = pcall(function()
-                    ScreenGui.Parent = pg
-                end)
-                if ok then
-                    guiParent = pg
-                    guiSource = "PlayerGui (direct)"
-                end
-            end
+        if guiCreated then
+            guiParent = playerGui
+            guiSource = "PlayerGui (fallback)"
         end
     end
 end
 
-setGuiParent()
-
--- If still not parented, try StarterGui
-if not ScreenGui.Parent then
+-- If still failed, warn user
+if not guiCreated or not ScreenGui.Parent then
+    warn("[oxyX] Failed to create GUI: " .. tostring(guiError))
+    -- Try one more time with StarterGui
     pcall(function()
         ScreenGui.Parent = StarterGui
     end)
-    if ScreenGui.Parent then
-        guiSource = "StarterGui (fallback)"
-    end
 end
 
--- If STILL not parented, error
+-- Verify GUI was created
 if not ScreenGui.Parent then
-    error("[oxyX] CRITICAL: Cannot create GUI! Game may not be fully loaded. Try again in a few seconds.")
+    error("[oxyX] CRITICAL: Could not create GUI! Please report this error.")
 end
-
-print("[oxyX] GUI created successfully on: " .. guiSource)
 
 -- ============================================================
--- MAIN FRAME (Fixed sizing)
+-- MAIN FRAME (Increased for Save Other Build)
 -- ============================================================
 local MainFrame = Instance.new("Frame", ScreenGui)
 MainFrame.Name = "MainFrame"
-MainFrame.Size = UDim2.new(0, 560, 0, 520)  -- Fixed to 520
-MainFrame.Position = UDim2.new(0.5, -280, 0.5, -260)
+MainFrame.Size = UDim2.new(0, 560, 0, 620)  -- Increased for Save Other Build section
+MainFrame.Position = UDim2.new(0.5, -280, 0.5, -310)
 MainFrame.BackgroundColor3 = Color3.fromRGB(10, 10, 18)
 MainFrame.BorderSizePixel = 0
 MainFrame.ClipsDescendants = true
@@ -575,7 +553,7 @@ local TitleLabel = Instance.new("TextLabel", TitleBar)
 TitleLabel.Size = UDim2.new(1, -100, 1, 0)
 TitleLabel.Position = UDim2.new(0, 14, 0, 0)
 TitleLabel.BackgroundTransparency = 1
-TitleLabel.Text = "⚡ oxyX BABFT Suite v2.5"
+TitleLabel.Text = "⚡ oxyX BABFT Suite v2.6 - Save Other Build"
 TitleLabel.TextColor3 = Color3.fromRGB(200, 150, 255)
 TitleLabel.Font = Enum.Font.GothamBold
 TitleLabel.TextSize = 16
@@ -1018,6 +996,284 @@ statusStroke.Color = Color3.fromRGB(50, 30, 90)
 statusStroke.Thickness = 1
 
 -- ============================================================
+-- SAVE OTHER PLAYER'S BUILD SECTION
+-- ============================================================
+local saveOtherY = buildDataY + 340
+
+createLabel(ContentFrame, "💾 Save Other Player's Build:", saveOtherY, 18, Color3.fromRGB(160, 120, 220))
+
+-- Player name input
+createLabel(ContentFrame, "👤 Target Player Name:", saveOtherY + 22, 14, Color3.fromRGB(140, 100, 180))
+local targetPlayerInput, _ = createInput(ContentFrame, "Enter player name...", saveOtherY + 38, 32)
+
+-- Build name input
+createLabel(ContentFrame, "📝 Build Name:", saveOtherY + 74, 14, Color3.fromRGB(140, 100, 180))
+local buildNameInput, _ = createInput(ContentFrame, "My Awesome Build", saveOtherY + 90, 32)
+
+-- Team selector
+createLabel(ContentFrame, "🏷️ Select Team:", saveOtherY + 126, 14, Color3.fromRGB(140, 100, 180))
+
+local teamOptions = {"Blue", "Red", "Green", "Yellow", "Orange", "Purple"}
+local selectedTeam = {value = "Blue"}
+
+local teamBg = Instance.new("Frame", ContentFrame)
+teamBg.Size = UDim2.new(1, 0, 0, 34)
+teamBg.Position = UDim2.new(0, 0, 0, saveOtherY + 142)
+teamBg.BackgroundColor3 = Color3.fromRGB(20, 15, 38)
+teamBg.BorderSizePixel = 0
+
+local teamCorner = Instance.new("UICorner", teamBg)
+teamCorner.CornerRadius = UDim.new(0, 8)
+
+local teamStroke = Instance.new("UIStroke", teamBg)
+teamStroke.Color = Color3.fromRGB(70, 40, 130)
+teamStroke.Thickness = 1
+
+local teamLbl = Instance.new("TextLabel", teamBg)
+teamLbl.Size = UDim2.new(1, -10, 1, 0)
+teamLbl.Position = UDim2.new(0, 8, 0, 0)
+teamLbl.BackgroundTransparency = 1
+teamLbl.Text = "🏷️ Blue"
+teamLbl.TextColor3 = Color3.fromRGB(180, 180, 220)
+teamLbl.Font = Enum.Font.Gotham
+teamLbl.TextSize = 12
+teamLbl.TextXAlignment = Enum.TextXAlignment.Left
+
+local teamDropFrame = Instance.new("Frame", ContentFrame)
+teamDropFrame.Size = UDim2.new(1, 0, 0, 0)
+teamDropFrame.Position = UDim2.new(0, 0, 0, saveOtherY + 180)
+teamDropFrame.BackgroundColor3 = Color3.fromRGB(16, 12, 30)
+teamDropFrame.BorderSizePixel = 0
+teamDropFrame.ClipsDescendants = true
+teamDropFrame.Visible = false
+
+local teamDropCorner = Instance.new("UICorner", teamDropFrame)
+teamDropCorner.CornerRadius = UDim.new(0, 8)
+
+local teamDropScroll = Instance.new("ScrollingFrame", teamDropFrame)
+teamDropScroll.Size = UDim2.new(1, -4, 1, 0)
+teamDropScroll.Position = UDim2.new(0, 2, 0, 0)
+teamDropScroll.BackgroundTransparency = 1
+teamDropScroll.ScrollBarThickness = 3
+teamDropScroll.ScrollBarImageColor3 = Color3.fromRGB(100, 50, 220)
+teamDropScroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
+
+local teamDropLayout = Instance.new("UIListLayout", teamDropScroll)
+teamDropLayout.SortOrder = Enum.SortOrder.LayoutOrder
+teamDropLayout.Padding = UDim.new(0, 2)
+
+local teamDropOpen = false
+
+-- Populate team dropdown
+for idx, teamName in ipairs(teamOptions) do
+    local teamBtn = Instance.new("TextButton", teamDropScroll)
+    teamBtn.Size = UDim2.new(1, 0, 0, 30)
+    teamBtn.BackgroundColor3 = Color3.fromRGB(22, 16, 42)
+    teamBtn.Text = "  🏷️ " .. teamName
+    teamBtn.TextColor3 = Color3.fromRGB(200, 180, 240)
+    teamBtn.Font = Enum.Font.Gotham
+    teamBtn.TextSize = 11
+    teamBtn.TextXAlignment = Enum.TextXAlignment.Left
+    teamBtn.BorderSizePixel = 0
+    teamBtn.AutoButtonColor = false
+    teamBtn.LayoutOrder = idx
+    
+    local teamBtnCorner = Instance.new("UICorner", teamBtn)
+    teamBtnCorner.CornerRadius = UDim.new(0, 6)
+    
+    teamBtn.MouseEnter:Connect(function()
+        tween(teamBtn, {BackgroundColor3 = Color3.fromRGB(50, 35, 90)}, 0.1)
+    end)
+    teamBtn.MouseLeave:Connect(function()
+        tween(teamBtn, {BackgroundColor3 = Color3.fromRGB(22, 16, 42)}, 0.1)
+    end)
+    
+    teamBtn.MouseButton1Click:Connect(function()
+        selectedTeam.value = teamName
+        teamLbl.Text = "🏷️ " .. teamName
+        teamLbl.TextColor3 = Color3.fromRGB(180, 220, 255)
+        
+        teamDropOpen = false
+        tween(teamDropFrame, {Size = UDim2.new(1, 0, 0, 0)}, 0.2)
+        task.delay(0.25, function()
+            teamDropFrame.Visible = false
+        end)
+    end)
+end
+
+teamBg.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        teamDropOpen = not teamDropOpen
+        if teamDropOpen then
+            teamDropFrame.Visible = true
+            local targetH = #teamOptions * 32 + 8
+            tween(teamDropFrame, {Size = UDim2.new(1, 0, 0, targetH)}, 0.2)
+            tween(teamStroke, {Color = Color3.fromRGB(140, 80, 255)}, 0.2)
+        else
+            tween(teamDropFrame, {Size = UDim2.new(1, 0, 0, 0)}, 0.2)
+            task.delay(0.25, function() teamDropFrame.Visible = false end)
+            tween(teamStroke, {Color = Color3.fromRGB(70, 40, 130)}, 0.2)
+        end
+    end
+end)
+
+-- Save Other Player's Build button
+local saveOtherBtn = createButton(ContentFrame, "💾 SAVE OTHER PLAYER'S BUILD", saveOtherY + 184, Color3.fromRGB(80, 120, 200))
+
+-- ============================================================
+-- SAVE OTHER PLAYER BUILD LOGIC
+-- ============================================================
+local function getOtherPlayerBuild(targetPlayerName)
+    local targetPlayer = nil
+    
+    -- Find player by name
+    for _, p in ipairs(Players:GetPlayers()) do
+        if string.find(string.lower(p.Name), string.lower(targetPlayerName)) then
+            targetPlayer = p
+            break
+        end
+    end
+    
+    if not targetPlayer then
+        return nil, "Player not found!"
+    end
+    
+    -- Try to get player's build data
+    -- Method 1: Check character/boat
+    local buildParts = {}
+    
+    pcall(function()
+        if targetPlayer.Character then
+            -- Get all parts in character's boat area
+            for _, obj in ipairs(targetPlayer.Character:GetChildren()) do
+                if obj:IsA("Model") or obj:IsA("Folder") then
+                    for _, part in ipairs(obj:GetChildren()) do
+                        if part:IsA("BasePart") then
+                            table.insert(buildParts, {
+                                Position = {
+                                    x = math.round(part.Position.X),
+                                    y = math.round(part.Position.Y),
+                                    z = math.round(part.Position.Z)
+                                },
+                                Size = {
+                                    x = math.round(part.Size.X * 10) / 10,
+                                    y = math.round(part.Size.Y * 10) / 10,
+                                    z = math.round(part.Size.Z * 10) / 10
+                                },
+                                Block = "Wood",
+                                Color = {
+                                    r = math.round(part.Color.r * 255),
+                                    g = math.round(part.Color.g * 255),
+                                    b = math.round(part.Color.b * 255)
+                                }
+                            })
+                        end
+                    end
+                end
+            end
+        end
+    end)
+    
+    -- Method 2: Check workspace for player's build
+    pcall(function()
+        for _, model in ipairs(workspace:GetChildren()) do
+            local ownerTag = model:FindFirstChild("Owner") or model:FindFirstChild("owner")
+            if ownerTag and string.find(string.lower(tostring(ownerTag.Value)), string.lower(targetPlayerName)) then
+                for _, part in ipairs(model:GetChildren()) do
+                    if part:IsA("BasePart") then
+                        table.insert(buildParts, {
+                            Position = {
+                                x = math.round(part.Position.X),
+                                y = math.round(part.Position.Y),
+                                z = math.round(part.Position.Z)
+                            },
+                            Size = {
+                                x = math.round(part.Size.X * 10) / 10,
+                                y = math.round(part.Size.Y * 10) / 10,
+                                z = math.round(part.Size.Z * 10) / 10
+                            },
+                            Block = "Wood",
+                            Color = {
+                                r = math.round(part.Color.r * 255),
+                                g = math.round(part.Color.g * 255),
+                                b = math.round(part.Color.b * 255)
+                            }
+                        })
+                    end
+                end
+            end
+        end
+    end)
+    
+    if #buildParts == 0 then
+        return nil, "Could not find build for " .. targetPlayer.Name
+    end
+    
+    return buildParts, nil
+end
+
+local function saveBuildToFile(fileName, buildData, teamName)
+    local saveData = {
+        name = fileName,
+        team = teamName,
+        owner = player.Name,
+        timestamp = os.time(),
+        parts = buildData
+    }
+    
+    local jsonData = game:GetService("HttpService"):JSONEncode(saveData)
+    
+    local saveFileName = fileName .. ".build"
+    if writeWorkspaceFile(saveFileName, jsonData) then
+        return saveFileName
+    end
+    return nil
+end
+
+saveOtherBtn.MouseButton1Click:Connect(function()
+    local targetName = targetPlayerInput.Text
+    local buildName = buildNameInput.Text
+    local teamName = selectedTeam.value
+    
+    if not targetName or targetName == "" or targetName == "Enter player name..." then
+        notify("oxyX Save", "Please enter target player name!", 3)
+        return
+    end
+    
+    if not buildName or buildName == "" or buildName == "My Awesome Build" then
+        notify("oxyX Save", "Please enter build name!", 3)
+        return
+    end
+    
+    buildStatus.Text = "Status: 🔍 Searching for " .. targetName .. "'s build..."
+    buildStatus.TextColor3 = Color3.fromRGB(120, 180, 255)
+    
+    task.delay(0.5, function()
+        local buildData, err = getOtherPlayerBuild(targetName)
+        
+        if err or not buildData then
+            buildStatus.Text = "Status: ❌ " .. (err or "Build not found!")
+            buildStatus.TextColor3 = Color3.fromRGB(255, 80, 80)
+            notify("oxyX Save", err or "Build not found!", 3)
+            return
+        end
+        
+        local fileName = buildName .. "." .. teamName
+        local saved = saveBuildToFile(buildName, buildData, teamName)
+        
+        if saved then
+            buildStatus.Text = "Status: ✅ Saved: " .. saved .. " (" .. #buildData .. " parts)"
+            buildStatus.TextColor3 = Color3.fromRGB(120, 255, 120)
+            notify("oxyX Save", "Build saved as: " .. saved, 4)
+        else
+            buildStatus.Text = "Status: ❌ Failed to save build!"
+            buildStatus.TextColor3 = Color3.fromRGB(255, 80, 80)
+            notify("oxyX Save", "Failed to save build!", 3)
+        end
+    end)
+end)
+
+-- ============================================================
 -- UPLOAD BUTTON LOGIC
 -- ============================================================
 uploadBtn.MouseButton1Click:Connect(function()
@@ -1236,14 +1492,14 @@ task.delay(0.1, function()
     pcall(function()
         ScreenGui.Enabled = true
         MainFrame.Visible = true
-        MainFrame.Size = UDim2.new(0, 560, 0, 520)
-        MainFrame.Position = UDim2.new(0.5, -280, 0.5, -260)
+        MainFrame.Size = UDim2.new(0, 560, 0, 620)
+        MainFrame.Position = UDim2.new(0.5, -280, 0.5, -310)
     end)
-    notify("oxyX BABFT v2.5", "Loaded! Executor: " .. rawExecutor, 4)
+    notify("oxyX BABFT v2.6 - Save Other Build", "Loaded! Executor: " .. rawExecutor, 4)
 end)
 
 -- ============================================================
 -- END
 -- ============================================================
--- oxyX BABFT Suite v2.5 (Fixed)
+-- oxyX BABFT Suite v2.6 - Save Other Build
 -- Powered by oxyX Market

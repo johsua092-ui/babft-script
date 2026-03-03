@@ -360,28 +360,53 @@ local function analyzeBuildBlocks(buildData)
     local requiredBlocks = {}
     local blockCounts = {}
     
+    -- DEBUG: Show how many parts we're analyzing
+    notify("oxyX Debug", "Analyzing " .. #buildData .. " parts...", 3)
+    
     for _, partData in ipairs(buildData) do
         if type(partData) == "table" then
-            local mat = partData.material or partData.Material or "SmoothPlastic"
-            local color = partData.color or partData.Color or {r=163, g=162, b=165}
+            -- Support multiple field names
+            local mat = partData.material or partData.Material or partData.Block or "SmoothPlastic"
+            local color = partData.color or partData.Color or partData.Colour or {r=163, g=162, b=165}
             
             -- Find matching block from library
             local blockName = mat
+            local found = false
+            
             for _, block in ipairs(blockLibrary) do
                 if block.material:lower() == mat:lower() then
-                    local colorMatch = math.abs(block.color.r - (color.r or color.R or 163)) < 20
-                        and math.abs(block.color.g - (color.g or color.G or 162)) < 20
-                        and math.abs(block.color.b - (color.b or color.B or 165)) < 20
+                    local colorR = color.r or color.R or 163
+                    local colorG = color.g or color.G or 162
+                    local colorB = color.b or color.B or 165
+                    
+                    local colorMatch = math.abs(block.color.r - colorR) < 20
+                        and math.abs(block.color.g - colorG) < 20
+                        and math.abs(block.color.b - colorB) < 20
                     if colorMatch then
                         blockName = block.name
+                        found = true
                         break
                     end
                 end
             end
             
+            -- If no match found, use the material name directly
+            if not found then
+                blockName = mat
+            end
+            
             blockCounts[blockName] = (blockCounts[blockName] or 0) + 1
         end
     end
+    
+    -- DEBUG: Show what blocks we found
+    local debugBlocks = ""
+    local count = 0
+    for name, cnt in pairs(blockCounts) do
+        debugBlocks = debugBlocks .. name .. "=" .. cnt .. " "
+        count = count + 1
+    end
+    notify("oxyX Debug", "Found " .. count .. " block types: " .. debugBlocks, 5)
     
     -- Convert to sorted list
     for name, count in pairs(blockCounts) do
@@ -1504,6 +1529,18 @@ buildBtn.MouseButton1Click:Connect(function()
     -- DEBUG: Show block analysis
     buildStatus.Text = "Status: 📊 Found " .. #requiredBlocks .. " block types..."
     buildStatus.TextColor3 = Color3.fromRGB(120, 200, 255)
+    
+    -- Check if all blocks are SmoothPlastic (might indicate parsing issue)
+    local allSmoothPlastic = true
+    for _, block in ipairs(requiredBlocks) do
+        if block.name ~= "SmoothPlastic" then
+            allSmoothPlastic = false
+            break
+        end
+    end
+    if allSmoothPlastic and #requiredBlocks == 1 then
+        notify("oxyX Warning", "Only SmoothPlastic detected - file format might be incorrect! Check .build file structure.", 5)
+    end
     task.wait(0.5)
     
     local hasRequired = true

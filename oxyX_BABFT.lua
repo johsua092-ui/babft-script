@@ -4,8 +4,178 @@
 -- ██║   ██║ ██╔██╗   ╚██╔╝   ██╔██╗ 
 -- ╚██████╔╝██╔╝ ██╗   ██║   ██╔╝ ██╗
 --  ╚═════╝ ╚═╝  ╚═╝   ╚═╝   ╚═╝  ╚═╝
--- oxyX BABFT Suite v2.0 | Powered by oxyX Market
+-- oxyX BABFT Suite v2.1 | Powered by oxyX Market
 -- Compatible: Xeno / Velocity / Fluxus
+
+-- ============================================================
+-- BABFT INVENTORY INTEGRATION
+-- ============================================================
+-- Build A Boat For Treasure block inventory system
+
+-- Try to get BABFT block inventory from various possible locations
+local function getPlayerBlockInventory()
+    local inventory = {}
+    
+    pcall(function()
+        -- Method 1: leaderstats (common in many games)
+        if player:FindFirstChild("leaderstats") then
+            local leaderstats = player.leaderstats
+            for _, stat in ipairs(leaderstats:GetChildren()) do
+                if stat:IsA("IntValue") or stat:IsA("NumberValue") then
+                    inventory[stat.Name] = stat.Value
+                elseif stat:IsA("StringValue") then
+                    -- Might be JSON encoded inventory
+                    local ok, decoded = pcall(function()
+                        return HttpService:JSONDecode(stat.Value)
+                    end)
+                    if ok and type(decoded) == "table" then
+                        for blockName, count in pairs(decoded) do
+                            inventory[blockName] = count
+                        end
+                    end
+                end
+            end
+        end
+    end)
+    
+    pcall(function()
+        -- Method 2: Direct child named "Blocks" or "Inventory"
+        local inventoryObj = player:FindFirstChild("Blocks") or player:FindFirstChild("Inventory") or player:FindFirstChild("BlockInventory")
+        if inventoryObj then
+            for _, block in ipairs(inventoryObj:GetChildren()) do
+                if block:IsA("IntValue") or block:IsA("NumberValue") then
+                    inventory[block.Name] = block.Value
+                elseif block:IsA("StringValue") then
+                    local ok, count = pcall(tonumber, block.Value)
+                    if ok then
+                        inventory[block.Name] = count
+                    end
+                end
+            end
+        end
+    end)
+    
+    pcall(function()
+        -- Method 3: Player data in ReplicatedStorage (some games)
+        local rs = game:GetService("ReplicatedStorage")
+        local playerData = rs:FindFirstChild("PlayerData") or rs:FindFirstChild("Inventories")
+        if playerData then
+            local thisPlayerData = playerData:FindFirstChild(tostring(player.UserId))
+            if thisPlayerData then
+                local blocks = thisPlayerData:FindFirstChild("Blocks") or thisPlayerData:FindFirstChild("Inventory")
+                if blocks then
+                    for _, block in ipairs(blocks:GetChildren()) do
+                        if block:IsA("IntValue") or block:IsA("NumberValue") then
+                            inventory[block.Name] = block.Value
+                        end
+                    end
+                end
+            end
+        end
+    end)
+    
+    return inventory
+end
+
+-- Check if player has enough of a specific block
+local function hasBlock(blockName, amount)
+    amount = amount or 1
+    local inventory = getPlayerBlockInventory()
+    local available = inventory[blockName] or 0
+    return available >= amount
+end
+
+-- Try to use/deduct block from inventory (returns true if successful)
+local function useBlock(blockName, amount)
+    amount = amount or 1
+    
+    -- Method 1: Try RemoteEvent
+    pcall(function()
+        local rs = game:GetService("ReplicatedStorage")
+        local useBlockRemote = rs:FindFirstChild("UseBlock") 
+            or rs:FindFirstChild("UseItem")
+            or rs:FindFirstChild("RemoveBlock")
+            or rs:FindFirstChild("SpendBlock")
+            or rs:FindFirstChild("TakeBlock")
+        
+        if useBlockRemote and useBlockRemote:IsA("RemoteFunction") then
+            local result = useBlockRemote:InvokeServer(blockName, amount)
+            if result == true or result == "success" then
+                return true
+            end
+        elseif useBlockRemote and useBlockRemote:IsA("RemoteEvent") then
+            useBlockRemote:FireServer(blockName, amount)
+            return true
+        end
+    end)
+    
+    -- Method 2: Direct modification (for local testing / bypass)
+    -- Note: This rarely works in online games due to anti-cheat
+    pcall(function()
+        -- Try leaderstats
+        if player:FindFirstChild("leaderstats") then
+            local blockStat = player.leaderstats:FindFirstChild(blockName)
+            if blockStat and blockStat:IsA("IntValue") then
+                blockStat.Value = math.max(0, blockStat.Value - amount)
+                return true
+            end
+        end
+        
+        -- Try player children
+        local blockObj = player:FindFirstChild(blockName)
+        if blockObj and blockObj:IsA("IntValue") then
+            blockObj.Value = math.max(0, blockObj.Value - amount)
+            return true
+        end
+    end)
+    
+    return false
+end
+
+-- Get inventory display string
+local function getInventoryDisplay()
+    local inventory = getPlayerBlockInventory()
+    local count = 0
+    local totalBlocks = 0
+    for _, v in pairs(inventory) do
+        count = count + 1
+        totalBlocks = totalBlocks + (tonumber(v) or 0)
+    end
+    if count == 0 then
+        return "No inventory data found"
+    end
+    return count .. " types, " .. totalBlocks .. " total blocks"
+end
+
+-- Show inventory warning before build
+local function checkInventoryAndWarn(requiredBlocks)
+    local inventory = getPlayerBlockInventory()
+    local missing = {}
+    local hasEnough = true
+    
+    for blockName, amount in pairs(requiredBlocks) do
+        local available = inventory[blockName] or 0
+        if available < amount then
+            table.insert(missing, {name = blockName, needed = amount, have = available})
+            hasEnough = false
+        end
+    end
+    
+    if not hasEnough then
+        local missingStr = ""
+        for _, m in ipairs(missing) do
+            missingStr = missingStr .. "\n  • " .. m.name .. ": need " .. m.needed .. ", have " .. m.have
+        end
+        notify("oxyX Inventory", "Missing blocks:" .. missingStr, 6)
+        return false
+    end
+    
+    return true
+end
+
+-- ============================================================
+-- BABFT INVENTORY INTEGRATION END
+-- ============================================================
 
 -- ============================================================
 -- EXECUTOR DETECTION
@@ -1223,6 +1393,9 @@ posInput.Text = "0, 5, 0"
 local buildBtn = createButton(p1, "🔨 START AUTOBUILD", finalBuildControlsY + 120, Color3.fromRGB(80, 40, 180))
 local stopBuildBtn = createButton(p1, "⏹ STOP BUILD", finalBuildControlsY + 166, Color3.fromRGB(160, 40, 80))
 
+-- Inventory check button
+local checkInvBtn = createButton(p1, "🎒 CHECK INVENTORY", finalBuildControlsY + 212, Color3.fromRGB(40, 120, 160))
+
 local buildStatus, _ = createStatusBox(p1, finalBuildControlsY + 212)
 
 -- ============================================================
@@ -1293,6 +1466,28 @@ buildBtn.MouseButton1Click:Connect(function()
         return
     end
 
+    -- Analyze required blocks
+    local requiredBlocks = analyzeBuildBlocks(buildData)
+    local hasRequired = true
+    local missingList = {}
+    
+    for blockName, amount in pairs(requiredBlocks) do
+        if not hasBlock(blockName, amount) then
+            hasRequired = false
+            table.insert(missingList, blockName .. " (" .. amount .. ")")
+        end
+    end
+    
+    if not hasRequired then
+        buildStatus.Text = "Status: ⚠️ Missing blocks! Build cancelled."
+        buildStatus.TextColor3 = Color3.fromRGB(255, 180, 80)
+        notify("oxyX Inventory", "Missing: " .. table.concat(missingList, ", "), 5)
+        return
+    end
+    
+    buildStatus.Text = "Status: ✅ Inventory OK! Starting build..."
+    buildStatus.TextColor3 = Color3.fromRGB(120, 255, 120)
+
     buildRunning = true
     buildStatus.Text = "Status: 🔨 Building... (0/" .. #buildData .. ") from " .. buildFileSelected.name
     buildStatus.TextColor3 = Color3.fromRGB(120, 200, 255)
@@ -1354,6 +1549,31 @@ buildBtn.MouseButton1Click:Connect(function()
 
         if buildRunning then
             buildRunning = false
+            
+            -- Deduct blocks from inventory after successful build
+            local deducted = {}
+            local failedDeduct = {}
+            for blockName, amount in pairs(requiredBlocks) do
+                if useBlock(blockName, amount) then
+                    deducted[blockName] = amount
+                else
+                    table.insert(failedDeduct, blockName)
+                end
+            end
+            
+            local deductMsg = ""
+            if next(deducted) then
+                for blk, amt in pairs(deducted) do
+                    deductMsg = deductMsg .. " -" .. amt .. " " .. blk
+                end
+            end
+            
+            if #failedDeduct > 0 then
+                notify("oxyX Inventory", "Could not deduct: " .. table.concat(failedDeduct, ", "), 4)
+            else
+                notify("oxyX Inventory", "Blocks deducted:" .. deductMsg, 4)
+            end
+            
             buildStatus.Text = "Status: ✅ Build Complete! (" .. #buildData .. " parts) — " .. buildFileSelected.name
             buildStatus.TextColor3 = Color3.fromRGB(120, 255, 120)
             notify("oxyX AutoBuild", "Build complete! " .. #buildData .. " parts placed.", 4)
@@ -1373,6 +1593,22 @@ stopBuildBtn.MouseButton1Click:Connect(function()
         notify("oxyX AutoBuild", "Build stopped.", 2)
     else
         notify("oxyX AutoBuild", "No build is running.", 2)
+    end
+end)
+
+-- Check inventory button
+checkInvBtn.MouseButton1Click:Connect(function()
+    local inventory = getPlayerBlockInventory()
+    local display = getInventoryDisplay()
+    notify("oxyX Inventory", display, 4)
+    
+    -- Also show in status
+    if next(inventory) then
+        buildStatus.Text = "Status: 🎒 " .. display
+        buildStatus.TextColor3 = Color3.fromRGB(100, 200, 255)
+    else
+        buildStatus.Text = "Status: ⚠️ No inventory found"
+        buildStatus.TextColor3 = Color3.fromRGB(255, 180, 80)
     end
 end)
 
@@ -1504,7 +1740,7 @@ local function objToRobloxStudioScript(vertices, faces, scale, objName)
     objName = objName or "OBJ_Import"
     local lines = {}
     table.insert(lines, "-- oxyX OBJ → Roblox Studio Import Script")
-    table.insert(lines, "-- Generated by oxyX BABFT Suite v2.0 | Powered by oxyX Market")
+    table.insert(lines, "-- Generated by oxyX BABFT Suite v2.1 | Powered by oxyX Market")
     table.insert(lines, "-- Paste this into Roblox Studio Command Bar or a Script")
     table.insert(lines, "-- Source: Roblox Studio OBJ format")
     table.insert(lines, "")
@@ -2101,7 +2337,7 @@ end)
 local p5 = tabPages[5]
 
 local infoLines = {
-    {"⚡ oxyX BABFT Suite v2.0", Color3.fromRGB(200, 150, 255), 16},
+    {"⚡ oxyX BABFT Suite v2.1", Color3.fromRGB(200, 150, 255), 16},
     {"Powered by oxyX Market", Color3.fromRGB(120, 80, 180), 12},
     {"", Color3.fromRGB(255,255,255), 8},
     {"🔨 AutoBuild", Color3.fromRGB(160, 120, 220), 13},
@@ -2191,13 +2427,13 @@ switchTab(1)
 -- STARTUP NOTIFICATION
 -- ============================================================
 task.delay(0.6, function()
-    notify("oxyX BABFT Suite v2.0", "Loaded! Executor: " .. executor, 4)
+    notify("oxyX BABFT Suite v2.1", "Loaded! Executor: " .. executor, 4)
 end)
 
 -- ============================================================
 -- END OF SCRIPT
 -- ============================================================
--- oxyX BABFT Suite v2.0
+-- oxyX BABFT Suite v2.1
 -- Powered by oxyX Market
 -- Compatible: Xeno / Velocity / Fluxus
 -- New in v2.0:

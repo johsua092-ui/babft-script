@@ -91,7 +91,7 @@ local function detectGuiParent()
         print("[oxyX] GUI Parent found: PlayerGui (waited)")
         return true
     end
-    
+     
     -- Method 3: Try Hidden UI root (executor)
     local ok_hui, hui = pcall(function()
         return gethui and gethui()
@@ -954,6 +954,33 @@ pcall(function()
 end)
 ScreenGui.DisplayOrder = 10000
 
+local function mountNow()
+    local parentSet = false
+    local ok_hui, hui = pcall(function() return gethui and gethui() end)
+    if ok_hui and hui then
+        local s = pcall(function() ScreenGui.Parent = hui end)
+        if s and ScreenGui.Parent then parentSet = true end
+    end
+    if not parentSet then
+        local successCore, CoreGui = pcall(game.GetService, game, "CoreGui")
+        if successCore and CoreGui then
+            local s = pcall(function() ScreenGui.Parent = CoreGui end)
+            if s and ScreenGui.Parent then parentSet = true end
+        end
+    end
+    if not parentSet then
+        local pg = player:FindFirstChild("PlayerGui") or player:WaitForChild("PlayerGui", 5)
+        if pg then
+            local s = pcall(function() ScreenGui.Parent = pg end)
+            if s and ScreenGui.Parent then parentSet = true end
+        end
+    end
+    ScreenGui.Enabled = true
+    if MainFrame then MainFrame.Visible = true end
+end
+
+mountNow()
+
 -- Try to set parent
 local function trySetParent()
     if not guiParent then return false end
@@ -1028,6 +1055,18 @@ end
 if not ScreenGui.Parent then
     warn("[oxyX] CRITICAL: GUI has no parent, but continuing...")
 end
+
+ScreenGui.AncestryChanged:Connect(function()
+    if not ScreenGui.Parent then
+        mountNow()
+    end
+end)
+
+player.CharacterAdded:Connect(function()
+    task.delay(0.2, function()
+        mountNow()
+    end)
+end)
 
 -- ============================================================
 -- MAIN FRAME
@@ -1242,6 +1281,259 @@ StatusBar.TextSize = 10
 local statusCorner = Instance.new("UICorner", StatusBar)
 statusCorner.CornerRadius = UDim.new(0, 0)
 
+local function buildSkin()
+    TitleBar.Visible = false
+    ContentFrame.Visible = false
+    StatusBar.Visible = false
+    local gap = 6
+    local pw = 307
+    local ph = 640
+    local LeftPanel = Instance.new("Frame", MainFrame)
+    LeftPanel.Size = UDim2.new(0, pw, 0, ph)
+    LeftPanel.Position = UDim2.new(0, 6, 0, 6)
+    LeftPanel.BackgroundColor3 = Color3.fromRGB(22, 22, 34)
+    LeftPanel.BorderSizePixel = 0
+    local lCorner = Instance.new("UICorner", LeftPanel)
+    lCorner.CornerRadius = UDim.new(0, 12)
+    local RightPanel = Instance.new("Frame", MainFrame)
+    RightPanel.Size = UDim2.new(0, pw, 0, ph)
+    RightPanel.Position = UDim2.new(0, 6 + pw + gap, 0, 6)
+    RightPanel.BackgroundColor3 = Color3.fromRGB(22, 22, 34)
+    RightPanel.BorderSizePixel = 0
+    local rCorner = Instance.new("UICorner", RightPanel)
+    rCorner.CornerRadius = UDim.new(0, 12)
+    local HeaderLeft = Instance.new("TextLabel", LeftPanel)
+    HeaderLeft.Size = UDim2.new(1, -14, 0, 32)
+    HeaderLeft.Position = UDim2.new(0, 7, 0, 7)
+    HeaderLeft.BackgroundTransparency = 1
+    HeaderLeft.Text = "oxyX"
+    HeaderLeft.TextColor3 = Color3.fromRGB(200, 200, 210)
+    HeaderLeft.Font = Enum.Font.GothamBold
+    HeaderLeft.TextSize = 16
+    local HeaderRight = Instance.new("TextLabel", RightPanel)
+    HeaderRight.Size = UDim2.new(1, -14, 0, 32)
+    HeaderRight.Position = UDim2.new(0, 7, 0, 7)
+    HeaderRight.BackgroundTransparency = 1
+    HeaderRight.Text = "Exploit"
+    HeaderRight.TextColor3 = Color3.fromRGB(200, 200, 210)
+    HeaderRight.Font = Enum.Font.GothamBold
+    HeaderRight.TextSize = 16
+    local msLabel = Instance.new("TextLabel", HeaderRight)
+    msLabel.Size = UDim2.new(0, 80, 0, 16)
+    msLabel.Position = UDim2.new(1, -86, 0, 8)
+    msLabel.BackgroundTransparency = 1
+    msLabel.Text = "0.0ms"
+    msLabel.TextColor3 = Color3.fromRGB(140, 220, 140)
+    msLabel.Font = Enum.Font.Gotham
+    msLabel.TextSize = 12
+    RunService.Heartbeat:Connect(function(dt)
+        msLabel.Text = string.format("%.1fms", dt * 1000)
+    end)
+    local TabBarLeft = Instance.new("Frame", LeftPanel)
+    TabBarLeft.Size = UDim2.new(1, -14, 0, 34)
+    TabBarLeft.Position = UDim2.new(0, 7, 0, 44)
+    TabBarLeft.BackgroundColor3 = Color3.fromRGB(28, 28, 42)
+    TabBarLeft.BorderSizePixel = 0
+    local tlCorner = Instance.new("UICorner", TabBarLeft)
+    tlCorner.CornerRadius = UDim.new(0, 8)
+    local TabBarRight = Instance.new("Frame", RightPanel)
+    TabBarRight.Size = UDim2.new(1, -14, 0, 34)
+    TabBarRight.Position = UDim2.new(0, 7, 0, 44)
+    TabBarRight.BackgroundColor3 = Color3.fromRGB(28, 28, 42)
+    TabBarRight.BorderSizePixel = 0
+    local trCorner = Instance.new("UICorner", TabBarRight)
+    trCorner.CornerRadius = UDim.new(0, 8)
+    local function makeTabBar(bar, names)
+        local layout = Instance.new("UIListLayout", bar)
+        layout.FillDirection = Enum.FillDirection.Horizontal
+        layout.Padding = UDim.new(0, 6)
+        layout.HorizontalAlignment = Enum.HorizontalAlignment.Left
+        local tabs = {}
+        for _, n in ipairs(names) do
+            local b = Instance.new("TextButton", bar)
+            b.Size = UDim2.new(0, 96, 1, 0)
+            b.BackgroundColor3 = Color3.fromRGB(40, 40, 56)
+            b.BorderSizePixel = 0
+            b.Text = n
+            b.TextColor3 = Color3.fromRGB(200, 200, 210)
+            b.Font = Enum.Font.GothamBold
+            b.TextSize = 12
+            local c = Instance.new("UICorner", b)
+            c.CornerRadius = UDim.new(0, 6)
+            table.insert(tabs, b)
+        end
+        return tabs
+    end
+    local tabsL = makeTabBar(TabBarLeft, {"AutoBuild","Image Loader","List"})
+    local tabsR = makeTabBar(TabBarRight, {"★ AutoFarm","Misc","Modules","Credit"})
+    local ContentLeft = Instance.new("Frame", LeftPanel)
+    ContentLeft.Size = UDim2.new(1, -14, 1, -86)
+    ContentLeft.Position = UDim2.new(0, 7, 0, 86)
+    ContentLeft.BackgroundColor3 = Color3.fromRGB(24, 24, 38)
+    ContentLeft.BorderSizePixel = 0
+    local clCorner = Instance.new("UICorner", ContentLeft)
+    clCorner.CornerRadius = UDim.new(0, 8)
+    local ContentRight = Instance.new("Frame", RightPanel)
+    ContentRight.Size = UDim2.new(1, -14, 1, -86)
+    ContentRight.Position = UDim2.new(0, 7, 0, 86)
+    ContentRight.BackgroundColor3 = Color3.fromRGB(24, 24, 38)
+    ContentRight.BorderSizePixel = 0
+    local crCorner = Instance.new("UICorner", ContentRight)
+    crCorner.CornerRadius = UDim.new(0, 8)
+    local AutoBuild = Instance.new("Frame", ContentLeft)
+    AutoBuild.Size = UDim2.new(1, 0, 1, 0)
+    AutoBuild.BackgroundTransparency = 1
+    local ImageLoader = Instance.new("Frame", ContentLeft)
+    ImageLoader.Size = UDim2.new(1, 0, 1, 0)
+    ImageLoader.BackgroundTransparency = 1
+    ImageLoader.Visible = false
+    local ListTab = Instance.new("Frame", ContentLeft)
+    ListTab.Size = UDim2.new(1, 0, 1, 0)
+    ListTab.BackgroundTransparency = 1
+    ListTab.Visible = false
+    local function showLeft(i)
+        AutoBuild.Visible = i==1
+        ImageLoader.Visible = i==2
+        ListTab.Visible = i==3
+        for idx, b in ipairs(tabsL) do
+            b.BackgroundColor3 = idx==i and Color3.fromRGB(0,140,100) or Color3.fromRGB(40,40,56)
+        end
+    end
+    for i,b in ipairs(tabsL) do
+        b.MouseButton1Click:Connect(function() showLeft(i) end)
+    end
+    showLeft(1)
+    local GoBack = Instance.new("TextButton", AutoBuild)
+    GoBack.Size = UDim2.new(1, 0, 0, 32)
+    GoBack.Position = UDim2.new(0, 0, 0, 0)
+    GoBack.BackgroundColor3 = Color3.fromRGB(150, 60, 60)
+    GoBack.BorderSizePixel = 0
+    GoBack.Text = "Go Back"
+    GoBack.TextColor3 = Color3.fromRGB(240, 240, 240)
+    GoBack.Font = Enum.Font.GothamBold
+    GoBack.TextSize = 12
+    local gbCorner = Instance.new("UICorner", GoBack)
+    gbCorner.CornerRadius = UDim.new(0, 6)
+    local RefLabel = Instance.new("TextLabel", AutoBuild)
+    RefLabel.Size = UDim2.new(1, 0, 0, 20)
+    RefLabel.Position = UDim2.new(0, 0, 0, 38)
+    RefLabel.BackgroundTransparency = 1
+    RefLabel.Text = "List Refreshed! (auto)"
+    RefLabel.TextColor3 = Color3.fromRGB(180, 200, 220)
+    RefLabel.Font = Enum.Font.Gotham
+    RefLabel.TextSize = 12
+    local FileList = Instance.new("ScrollingFrame", AutoBuild)
+    FileList.Size = UDim2.new(1, 0, 0, 180)
+    FileList.Position = UDim2.new(0, 0, 0, 62)
+    FileList.BackgroundTransparency = 1
+    FileList.ScrollBarThickness = 4
+    local flLayout = Instance.new("UIListLayout", FileList)
+    flLayout.Padding = UDim.new(0, 6)
+    local selectedPath = {value=nil}
+    local function populateFiles()
+        FileList:ClearAllChildren()
+        local files = listWorkspaceFiles(".build")
+        for _, f in ipairs(files) do
+            local btn = Instance.new("TextButton", FileList)
+            btn.Size = UDim2.new(1, -10, 0, 30)
+            btn.BackgroundColor3 = Color3.fromRGB(40, 40, 56)
+            btn.BorderSizePixel = 0
+            btn.Text = f.name
+            btn.TextColor3 = Color3.fromRGB(200, 200, 210)
+            btn.Font = Enum.Font.GothamBold
+            btn.TextSize = 12
+            local bc = Instance.new("UICorner", btn)
+            bc.CornerRadius = UDim.new(0, 6)
+            btn.MouseButton1Click:Connect(function()
+                selectedPath.value = f.path
+            end)
+        end
+    end
+    populateFiles()
+    local Status = Instance.new("TextLabel", AutoBuild)
+    Status.Size = UDim2.new(1, 0, 0, 20)
+    Status.Position = UDim2.new(0, 0, 0, 250)
+    Status.BackgroundTransparency = 1
+    Status.Text = "Status: nil"
+    Status.TextColor3 = Color3.fromRGB(180, 200, 220)
+    Status.Font = Enum.Font.Gotham
+    Status.TextSize = 12
+    local LoadBtn = Instance.new("TextButton", AutoBuild)
+    LoadBtn.Size = UDim2.new(1, 0, 0, 36)
+    LoadBtn.Position = UDim2.new(0, 0, 0, 276)
+    LoadBtn.BackgroundColor3 = Color3.fromRGB(80, 120, 80)
+    LoadBtn.BorderSizePixel = 0
+    LoadBtn.Text = "Load Build"
+    LoadBtn.TextColor3 = Color3.fromRGB(240, 240, 240)
+    LoadBtn.Font = Enum.Font.GothamBold
+    LoadBtn.TextSize = 13
+    local lbCorner = Instance.new("UICorner", LoadBtn)
+    lbCorner.CornerRadius = UDim.new(0, 8)
+    GoBack.MouseButton1Click:Connect(function()
+        TitleBar.Visible = true
+        ContentFrame.Visible = true
+        StatusBar.Visible = true
+        pcall(function() LeftPanel:Destroy() end)
+        pcall(function() RightPanel:Destroy() end)
+    end)
+    LoadBtn.MouseButton1Click:Connect(function()
+        if not selectedPath.value then
+            Status.Text = "Status: no file selected"
+            return
+        end
+        local raw = readWorkspaceFile(selectedPath.value)
+        if not raw or raw == "" then
+            Status.Text = "Status: read error"
+            return
+        end
+        local data = parseBuildData(raw)
+        if not data or #data == 0 then
+            Status.Text = "Status: invalid data"
+            return
+        end
+        TitleBar.Visible = true
+        ContentFrame.Visible = true
+        StatusBar.Visible = true
+        pcall(function() LeftPanel:Destroy() end)
+        pcall(function() RightPanel:Destroy() end)
+    end)
+    local AFPanel = Instance.new("Frame", ContentRight)
+    AFPanel.Size = UDim2.new(1, 0, 1, 0)
+    AFPanel.BackgroundTransparency = 1
+    local function markR(sel)
+        for idx, b in ipairs(tabsR) do
+            b.BackgroundColor3 = idx==sel and Color3.fromRGB(0,140,100) or Color3.fromRGB(40,40,56)
+        end
+    end
+    for i,b in ipairs(tabsR) do
+        b.MouseButton1Click:Connect(function() markR(i) end)
+    end
+    markR(1)
+    local AntiAfk = Instance.new("TextButton", AFPanel)
+    AntiAfk.Size = UDim2.new(1, 0, 0, 30)
+    AntiAfk.Position = UDim2.new(0, 0, 0, 0)
+    AntiAfk.BackgroundColor3 = Color3.fromRGB(40, 40, 56)
+    AntiAfk.BorderSizePixel = 0
+    AntiAfk.Text = "Anti-Afk"
+    AntiAfk.TextColor3 = Color3.fromRGB(200, 200, 210)
+    AntiAfk.Font = Enum.Font.GothamBold
+    AntiAfk.TextSize = 12
+    local aaCorner = Instance.new("UICorner", AntiAfk)
+    aaCorner.CornerRadius = UDim.new(0, 6)
+    local AutoFarm = Instance.new("TextButton", AFPanel)
+    AutoFarm.Size = UDim2.new(1, 0, 0, 30)
+    AutoFarm.Position = UDim2.new(0, 0, 0, 38)
+    AutoFarm.BackgroundColor3 = Color3.fromRGB(40, 40, 56)
+    AutoFarm.BorderSizePixel = 0
+    AutoFarm.Text = "AutoFarm"
+    AutoFarm.TextColor3 = Color3.fromRGB(200, 200, 210)
+    AutoFarm.Font = Enum.Font.GothamBold
+    AutoFarm.TextSize = 12
+    local afCorner = Instance.new("UICorner", AutoFarm)
+    afCorner.CornerRadius = UDim.new(0, 6)
+end
+
+buildSkin()
 -- ============================================================
 -- GUI HELPERS
 -- ============================================================
@@ -2466,8 +2758,8 @@ end)
 local function setupKeybinds()
     UserInputService.InputEnded:Connect(function(input)
         if input.KeyCode == Enum.KeyCode.RightShift or input.KeyCode == Enum.KeyCode.LeftShift then
-            if ScreenGui.Parent then
-                pcall(function() ScreenGui:Destroy() end)
+            if ScreenGui then
+                ScreenGui.Enabled = not ScreenGui.Enabled
             end
         end
     end)
@@ -2478,8 +2770,8 @@ setupKeybinds()
 pcall(function()
     player.Chatted:Connect(function(msg)
         if msg:lower() == "/oxyx" or msg:lower() == "/babft" then
-            if ScreenGui.Parent then
-                pcall(function() ScreenGui:Destroy() end)
+            if ScreenGui then
+                ScreenGui.Enabled = not ScreenGui.Enabled
             end
         end
     end)

@@ -92,7 +92,18 @@ local function detectGuiParent()
         return true
     end
     
-    -- Method 3: Try CoreGui
+    -- Method 3: Try Hidden UI root (executor)
+    local ok_hui, hui = pcall(function()
+        return gethui and gethui()
+    end)
+    if ok_hui and hui then
+        guiParent = hui
+        guiSource = "HiddenUI"
+        print("[oxyX] GUI Parent found: HiddenUI")
+        return true
+    end
+    
+    -- Method 4: Try CoreGui
     local success, CoreGui = pcall(game.GetService, game, "CoreGui")
     if success and CoreGui then
         guiParent = CoreGui
@@ -101,11 +112,7 @@ local function detectGuiParent()
         return true
     end
     
-    -- Method 4: Try StarterGui
-    guiParent = StarterGui
-    guiSource = "StarterGui"
-    print("[oxyX] GUI Parent found: StarterGui (fallback)")
-    return true
+    return false
 end
 
 detectGuiParent()
@@ -135,11 +142,26 @@ local function notify(title, msg, duration, color)
     notifGui.ResetOnSpawn = false
     notifGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
     
-    local parentSuccess, parentErr = pcall(function()
+    local parentSuccess = pcall(function()
         notifGui.Parent = guiParent
     end)
     if not parentSuccess or not notifGui.Parent then
-        notifGui.Parent = player.PlayerGui
+        local ok_hui, hui = pcall(function()
+            return gethui and gethui()
+        end)
+        if ok_hui and hui then
+            pcall(function() notifGui.Parent = hui end)
+        end
+        if not notifGui.Parent then
+            local successCore, CoreGui = pcall(game.GetService, game, "CoreGui")
+            if successCore and CoreGui then
+                pcall(function() notifGui.Parent = CoreGui end)
+            end
+        end
+        if not notifGui.Parent then
+            local pg = player:WaitForChild("PlayerGui", 5)
+            if pg then notifGui.Parent = pg end
+        end
     end
 
     local frame = Instance.new("Frame", notifGui)
@@ -950,15 +972,51 @@ local function trySetParent()
         end
     end
     
+    -- Try Hidden UI root
+    local ok_hui, hui = pcall(function()
+        return gethui and gethui()
+    end)
+    if ok_hui and hui then
+        success, err = pcall(function()
+            ScreenGui.Parent = hui
+        end)
+        if success and ScreenGui.Parent then
+            return true
+        end
+    end
+    
+    -- Try CoreGui
+    local successCore, CoreGui = pcall(game.GetService, game, "CoreGui")
+    if successCore and CoreGui then
+        success, err = pcall(function()
+            ScreenGui.Parent = CoreGui
+        end)
+        if success and ScreenGui.Parent then
+            return true
+        end
+    end
+    
     return false
 end
 
 if not trySetParent() then
     warn("[oxyX] WARNING: Could not set GUI parent properly")
-    -- Try StarterGui as last resort
-    pcall(function()
-        ScreenGui.Parent = StarterGui
-    end)
+    local pg = player:WaitForChild("PlayerGui", 5)
+    if pg then
+        pcall(function() ScreenGui.Parent = pg end)
+    else
+        local ok_hui, hui = pcall(function()
+            return gethui and gethui()
+        end)
+        if ok_hui and hui then
+            pcall(function() ScreenGui.Parent = hui end)
+        else
+            local successCore, CoreGui = pcall(game.GetService, game, "CoreGui")
+            if successCore and CoreGui then
+                pcall(function() ScreenGui.Parent = CoreGui end)
+            end
+        end
+    end
 end
 
 if not ScreenGui.Parent then

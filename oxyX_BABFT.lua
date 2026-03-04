@@ -947,6 +947,11 @@ ScreenGui.Name = "oxyX_BABFT"
 ScreenGui.ResetOnSpawn = false
 ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 ScreenGui.IgnoreGuiInset = true
+pcall(function()
+    if syn and syn.protect_gui then
+        syn.protect_gui(ScreenGui)
+    end
+end)
 
 -- Try to set parent
 local function trySetParent()

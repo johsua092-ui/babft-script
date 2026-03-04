@@ -952,6 +952,7 @@ pcall(function()
         syn.protect_gui(ScreenGui)
     end
 end)
+ScreenGui.DisplayOrder = 10000
 
 -- Try to set parent
 local function trySetParent()
@@ -2494,12 +2495,25 @@ local function showGUI()
             print("[oxyX] GUI Enabled = true")
         else
             print("[oxyX] WARNING: ScreenGui has no parent, trying to recreate...")
-            -- Try to recreate GUI
-            local playerGui = player:FindFirstChild("PlayerGui")
-            if playerGui then
-                ScreenGui.Parent = playerGui
+            local ok_hui, hui = pcall(function() return gethui and gethui() end)
+            if ok_hui and hui then
+                pcall(function() ScreenGui.Parent = hui end)
+            end
+            if not ScreenGui.Parent then
+                local successCore, CoreGui = pcall(game.GetService, game, "CoreGui")
+                if successCore and CoreGui then
+                    pcall(function() ScreenGui.Parent = CoreGui end)
+                end
+            end
+            if not ScreenGui.Parent then
+                local playerGui = player:FindFirstChild("PlayerGui") or player:WaitForChild("PlayerGui", 5)
+                if playerGui then
+                    ScreenGui.Parent = playerGui
+                end
+            end
+            if ScreenGui.Parent then
                 ScreenGui.Enabled = true
-                print("[oxyX] GUI recreated in PlayerGui")
+                print("[oxyX] GUI recreated via fallback")
             end
         end
         
